@@ -3,6 +3,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from booking.workflow import BookingWorkflow, init_workflow_tables, valid_booking
 import hashlib
 import os
 import re
@@ -21,6 +22,9 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 app.config["AVAILABILITY_URL"] = os.environ.get("AVAILABILITY_URL", "http://localhost:5002")
 app.config["INTERNAL_KEY"] = os.environ.get("INTERNAL_KEY", "")
 app.config["AVAILABILITY_TIMEOUT"] = 3
+app.config["NOTIFICATION_URL"] = os.environ.get("NOTIFICATION_URL", "http://localhost:5003")
+app.config["NOTIFICATION_TIMEOUT"] = 3
+app.config["RETRY_WORKER_ENABLED"] = os.environ.get("BOOKING_RETRY_WORKER", "1") == "1"
 
 # Return the service status.
 @app.get("/health")
@@ -79,6 +83,7 @@ def init_db():
             expires_at TEXT NOT NULL
         )
     """)
+    init_workflow_tables(db)
     db.commit()
     db.close()
 
@@ -273,6 +278,48 @@ def search_rooms():
     return {"rooms": [{field: room[field] for field in fields} for room in data["rooms"]]}
 
 
+# Save a pending order before asking Availability to reserve it.
+@app.post("/api/bookings")
+def create_booking():
+    customer_id = get_customer_id()
+    if customer_id is None:
+        return api_error("UNAUTHORIZED", "Invalid or missing customer token.", 401)
+    if not request.is_json:
+        return api_error("UNSUPPORTED_MEDIA_TYPE", "Use application/json.", 415)
+    data = request.get_json(silent=True)
+    if not valid_booking(data):
+        return api_error("VALIDATION_ERROR", "Send room_id, valid dates (1-30 nights), and an integer guest_count (1-8).", 400)
+    try:
+        request_key = str(uuid.UUID(request.headers.get("Idempotency-Key", "")))
+    except ValueError:
+        return api_error("VALIDATION_ERROR", "Send a UUID in Idempotency-Key.", 400)
+    return booking_workflow.submit(customer_id, data, request_key)
+
+
+# Another customer's booking is treated as not found.
+@app.get("/api/bookings/<booking_id>")
+def view_booking(booking_id):
+    customer_id = get_customer_id()
+    if customer_id is None:
+        return api_error("UNAUTHORIZED", "Invalid or missing customer token.", 401)
+    booking = booking_workflow.get_booking(booking_id, customer_id)
+    if booking is None:
+        return api_error("NOT_FOUND", "Booking not found.", 404)
+    return booking
+
+
+@app.before_request
+def start_booking_recovery():
+    if not app.config["TESTING"] and app.config["RETRY_WORKER_ENABLED"]:
+        booking_workflow.start_worker()
+
+
+@app.cli.command("retry-pending")
+def retry_pending():
+    """Run one recovery pass for saved pending work."""
+    booking_workflow.retry_once()
+
+
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
@@ -313,3 +360,4 @@ def handle_database_error(error):
 
 
 init_db()
+booking_workflow = BookingWorkflow(app.config, get_db)

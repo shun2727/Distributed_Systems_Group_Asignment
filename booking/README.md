@@ -1,7 +1,7 @@
 # Booking service: current progress
 
-Implemented: POST /api/register, POST /api/login, GET /api/bookings, GET /api/rooms and GET /health.
-Room search forwards HTTP requests to Availability. Create/view/cancel booking, reservation/notification calls and retry workers are still pending. Room search has been tested with a temporary HTTP stub; the teammate's real Availability service has not been integrated yet.
+Implemented: POST /api/register, POST /api/login, GET /api/bookings, GET /api/bookings/{booking_id}, POST /api/bookings, GET /api/rooms and GET /health.
+Room search, reservation creation/recovery and confirmation notifications call the other services over HTTP. Cancellation is still pending. Integration has been tested with temporary HTTP stubs; the teammates' real services have not been integrated yet.
 Follow ../api-guide.md for the full shared contract.
 
 ## Run from the repository root
@@ -57,3 +57,34 @@ Invoke-RestMethod `
 No configured key, an offline Availability service, timeout or invalid upstream response produces 503 SERVICE_UNAVAILABLE. A successful search with no matching rooms produces 200 with an empty rooms array. Bad dates/guest count produce 400; no valid login produces 401. Searching does not reserve rooms or change the booking database.
 
 The room-search tests start and stop a temporary HTTP stub automatically. They test the Booking integration contract, not the teammate's room-inventory or double-booking logic.
+
+## Create and view a booking
+
+Set NOTIFICATION_URL (default http://localhost:5003) along with the earlier Availability settings before starting Flask. Notification uses the same INTERNAL_KEY agreed with the team.
+
+After logging in, run this in the test terminal:
+
+```powershell
+$requestKey = [guid]::NewGuid().ToString()
+$bookingBody = @{ room_id = 'R101'; check_in = '2026-11-10'; check_out = '2026-11-12'; guest_count = 2 } | ConvertTo-Json
+$booking = Invoke-RestMethod `
+    -Uri 'http://localhost:5001/api/bookings' `
+    -Method Post -ContentType 'application/json' `
+    -Headers @{ 'X-Customer-Token' = $login.token; 'Idempotency-Key' = $requestKey } `
+    -Body $bookingBody
+Invoke-RestMethod `
+    -Uri "http://localhost:5001/api/bookings/$($booking.booking_id)" `
+    -Headers @{ 'X-Customer-Token' = $login.token }
+```
+
+Reuse the same request key and body if retrying the same attempt. Use a new key only for a new attempt. Booking saves one order per customer/key in a transaction before calling Availability. The same key with changed input returns 409 IDEMPOTENCY_CONFLICT. Definite rejection is saved and replayed. IDs and prices come from the backend, never the browser.
+
+201 means confirmed; 202 means pending. If Availability is offline or its response is lost, the order stays pending. A recovery worker checks the original booking ID, then confirms, rejects a released ID, or retries reservation with the same ID after 404. Confirmation and a pending notification event are saved in one local transaction. Notification failures never undo a confirmed booking. Retries reuse the saved event ID.
+
+The automatic worker starts on the first HTTP request, runs every five seconds and survives outages using saved database records. Restarting the service does not erase pending work. Each HTTP call has finite connect/read timeouts; dependency errors leave work pending. A permanent internal-key/API error requires fixing the configuration; retrying alone cannot fix it. In tests the automatic worker is disabled. Set BOOKING_RETRY_WORKER=0 to disable automatic recovery, or run one recovery pass manually:
+
+```powershell
+python -m flask --app booking.app retry-pending
+```
+
+The guide's cancellation endpoint is not implemented yet. Do not treat this as the whole distributed system being complete. The temporary services in tests only verify Booking's communication and recovery behavior; the Availability teammate must implement and test real inventory concurrency and room pricing.
