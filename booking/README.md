@@ -1,7 +1,7 @@
 # Booking service: current progress
 
-Implemented: POST /api/register, POST /api/login, GET /api/bookings, GET /api/bookings/{booking_id}, POST /api/bookings, GET /api/rooms and GET /health.
-Room search, reservation creation/recovery and confirmation notifications call the other services over HTTP. Cancellation is still pending. Integration has been tested with temporary HTTP stubs; the teammates' real services have not been integrated yet.
+Implemented: POST /api/register, POST /api/login, GET /api/bookings, GET /api/bookings/{booking_id}, POST /api/bookings, GET /api/rooms, POST /api/bookings/{booking_id}/cancel and GET /health.
+Room search, reservation creation/recovery and confirmation notifications call the other services over HTTP. Cancellation releases the reservation and retries safely after outages. Integration has been tested with temporary HTTP stubs; the teammates' real services have not been integrated yet.
 Follow ../api-guide.md for the full shared contract.
 
 ## Run from the repository root
@@ -87,4 +87,18 @@ The automatic worker starts on the first HTTP request, runs every five seconds a
 python -m flask --app booking.app retry-pending
 ```
 
-The guide's cancellation endpoint is not implemented yet. Do not treat this as the whole distributed system being complete. The temporary services in tests only verify Booking's communication and recovery behavior; the Availability teammate must implement and test real inventory concurrency and room pricing.
+The Booking cancellation endpoint is implemented. Do not treat this as the whole distributed system being complete. The temporary services in tests only verify Booking's communication and recovery behavior; the Availability teammate must implement and test real inventory concurrency and room pricing.
+
+## Cancel a booking
+
+After creating a confirmed booking:
+
+```powershell
+Invoke-RestMethod `
+    -Uri "http://localhost:5001/api/bookings/$($booking.booking_id)/cancel" `
+    -Method Post -Headers @{ 'X-Customer-Token' = $login.token }
+```
+
+Send no body. Only the owner may cancel; missing or another customer's booking returns 404. A pending booking returns 409 BOOKING_STATE_CONFLICT. A confirmed booking first becomes cancelling, then Booking asks Availability to release it. Only a matching 200 released response changes the order to cancelled. An outage, lost reply or invalid response leaves it cancelling (202); the existing recovery worker retries the same release URL. No order is deleted, and price/reservation details stay intact.
+
+Repeated cancelled/rejected cancellations return 200 with the unchanged order. A cancellation already in progress returns 202. Cancelled booking IDs are never reused for a new reservation; Availability must keep released-ID tombstones as defined in api-guide.md. A previously queued confirmation notification remains a historical event; the order's current state must always be read from Booking.

@@ -19,7 +19,8 @@ class BookingStub(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(body).encode())
 
     def do_POST(self):
-        data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+        raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        data = json.loads(raw) if raw else None
         with self.server.lock:
             self.server.calls.append(("POST", self.path, data, dict(self.headers)))
             if self.headers.get("X-Internal-Key") != "test-key":
@@ -30,12 +31,27 @@ class BookingStub(BaseHTTPRequestHandler):
                 first = data["event_id"] not in self.server.events
                 self.server.events[data["event_id"]] = data
                 return self.reply(201 if first else 200, {"event_id": data["event_id"], "status": "recorded"})
+            if self.path.startswith("/internal/reservations/") and self.path.endswith("/release"):
+                if self.server.availability_down:
+                    return self.reply(503, {})
+                booking_id = self.path.split("/")[-2]
+                self.server.reservations.setdefault(booking_id, {"booking_id": booking_id})["status"] = "released"
+                if getattr(self.server, "lose_release_reply", False):
+                    self.server.lose_release_reply = False
+                    self.connection.shutdown(socket.SHUT_RDWR)
+                    self.connection.close()
+                    return
+                if getattr(self.server, "bad_release_reply", False):
+                    return self.reply(200, {"booking_id": "wrong", "status": "released"})
+                return self.reply(200, {"booking_id": booking_id, "status": "released"})
             if self.path != "/internal/reservations":
                 return self.reply(404, {})
             if self.server.availability_down:
                 return self.reply(503, {})
             if self.server.reject:
                 return self.reply(409, {"error": {"code": "ROOM_UNAVAILABLE", "message": "Room unavailable."}})
+            if self.server.reservations.get(data["booking_id"], {}).get("status") == "released":
+                return self.reply(409, {"error": {"code": "RESERVATION_RELEASED"}})
             first = data["booking_id"] not in self.server.reservations
             reservation = self.server.reservations.setdefault(data["booking_id"], dict(
                 data, reservation_id="RS_" + data["booking_id"], status="reserved",

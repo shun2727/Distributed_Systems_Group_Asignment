@@ -137,6 +137,48 @@ class BookingWorkflow:
             self.send_notifications(booking_id)
         return self.result(booking_id, new)
 
+    def cancel(self, booking_id, customer_id):
+        db = self.get_db()
+        try:
+            with db:
+                db.execute("BEGIN IMMEDIATE")
+                row = db.execute("SELECT * FROM bookings WHERE booking_id=? AND customer_id=?",
+                                 (booking_id, customer_id)).fetchone()
+                if row is None:
+                    return error_reply("NOT_FOUND", "Booking not found.", 404)
+                booking = dict(row)
+                if booking["status"] == "pending":
+                    return error_reply("BOOKING_STATE_CONFLICT", "Wait for the pending booking result before cancelling.", 409, booking_id)
+                if booking["status"] in ("cancelled", "rejected"):
+                    return booking, 200
+                if booking["status"] == "cancelling":
+                    return booking, 202
+                # Save the intent first so recovery can finish after a restart.
+                db.execute("UPDATE bookings SET status='cancelling', updated_at=? WHERE booking_id=? AND status='confirmed'",
+                           (timestamp(), booking_id))
+        finally:
+            db.close()
+        self.release(self.get_booking(booking_id))
+        booking = self.get_booking(booking_id)
+        return booking, 200 if booking["status"] == "cancelled" else 202
+
+    def release(self, booking):
+        if booking is None or booking["status"] != "cancelling":
+            return
+        status, body = self.call("POST", "AVAILABILITY",
+            "/internal/reservations/" + booking["booking_id"] + "/release")
+        if (status != 200 or not isinstance(body, dict)
+                or body.get("booking_id") != booking["booking_id"] or body.get("status") != "released"):
+            return
+        db = self.get_db()
+        try:
+            with db:
+                # Only finish cancellation after Availability confirms release.
+                db.execute("UPDATE bookings SET status='cancelled', updated_at=? WHERE booking_id=? AND status='cancelling'",
+                           (timestamp(), booking["booking_id"]))
+        finally:
+            db.close()
+
     def call(self, method, service, path, data=None):
         if not self.config["INTERNAL_KEY"]:
             return None, None
@@ -253,11 +295,14 @@ class BookingWorkflow:
         try:
             db = self.get_db()
             try:
-                pending = db.execute("SELECT * FROM bookings WHERE status='pending' LIMIT 100").fetchall()
+                pending = db.execute("SELECT * FROM bookings WHERE status IN ('pending', 'cancelling') LIMIT 100").fetchall()
             finally:
                 db.close()
             for booking in pending:
-                self.recover(dict(booking))
+                if booking["status"] == "cancelling":
+                    self.release(dict(booking))
+                else:
+                    self.recover(dict(booking))
             self.send_notifications()
         finally:
             self.retry_lock.release()

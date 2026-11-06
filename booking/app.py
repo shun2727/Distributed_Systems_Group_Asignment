@@ -308,6 +308,17 @@ def view_booking(booking_id):
     return booking
 
 
+# Keep the order record; release the room before marking it cancelled.
+@app.post("/api/bookings/<booking_id>/cancel")
+def cancel_booking(booking_id):
+    customer_id = get_customer_id()
+    if customer_id is None:
+        return api_error("UNAUTHORIZED", "Invalid or missing customer token.", 401)
+    if request.content_length:
+        return api_error("VALIDATION_ERROR", "Cancellation has no request body.", 400)
+    return booking_workflow.cancel(booking_id, customer_id)
+
+
 @app.before_request
 def start_booking_recovery():
     if not app.config["TESTING"] and app.config["RETRY_WORKER_ENABLED"]:
