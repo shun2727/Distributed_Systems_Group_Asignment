@@ -1,11 +1,12 @@
 from flask import Flask, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import hashlib
 import os
 import re
+import requests
 import secrets
 import sqlite3
 import uuid
@@ -17,6 +18,9 @@ app.config["DATABASE"] = os.environ.get(
 )
 app.config["WEBSITE_ORIGIN"] = os.environ.get("WEBSITE_ORIGIN", "http://localhost:3000")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
+app.config["AVAILABILITY_URL"] = os.environ.get("AVAILABILITY_URL", "http://localhost:5002")
+app.config["INTERNAL_KEY"] = os.environ.get("INTERNAL_KEY", "")
+app.config["AVAILABILITY_TIMEOUT"] = 3
 
 # Return the service status.
 @app.get("/health")
@@ -196,6 +200,77 @@ def list_bookings():
     if customer_id is None:
         return api_error("UNAUTHORIZED", "Invalid or missing customer token.", 401)
     return {"bookings": get_bookings(customer_id)}
+
+
+# Check the dates and guest count before asking Availability.
+def read_room_search():
+    fields = {"check_in", "check_out", "guest_count"}
+    if set(request.args) != fields or any(len(request.args.getlist(k)) != 1 for k in fields):
+        return None
+    values = request.args.to_dict()
+    if request.content_length or any(
+        not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", values[k])
+        for k in ("check_in", "check_out")
+    ):
+        return None
+    try:
+        check_in = date.fromisoformat(values["check_in"])
+        check_out = date.fromisoformat(values["check_out"])
+    except ValueError:
+        return None
+    if not 1 <= (check_out - check_in).days <= 30:
+        return None
+    if not re.fullmatch(r"[0-9]{1,2}", values["guest_count"]):
+        return None
+    values["guest_count"] = int(values["guest_count"])
+    return values if 1 <= values["guest_count"] <= 8 else None
+
+
+# Reject incomplete room data instead of reporting a false search result.
+def valid_room(room, guest_count):
+    return (
+        isinstance(room, dict)
+        and isinstance(room.get("room_id"), str)
+        and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", room["room_id"]) is not None
+        and isinstance(room.get("room_number"), str)
+        and isinstance(room.get("room_type"), str)
+        and type(room.get("capacity")) is int
+        and guest_count <= room["capacity"] <= 8
+        and type(room.get("price_per_night_cents")) is int
+        and room["price_per_night_cents"] >= 0
+        and room.get("currency") == "MYR"
+    )
+
+
+# Ask Availability for rooms; searching never reserves a room.
+@app.get("/api/rooms")
+def search_rooms():
+    if get_customer_id() is None:
+        return api_error("UNAUTHORIZED", "Invalid or missing customer token.", 401)
+    params = read_room_search()
+    if params is None:
+        return api_error("VALIDATION_ERROR", "Send valid check_in, check_out and guest_count; stay must be 1-30 nights and guests 1-8.", 400)
+    key = app.config["INTERNAL_KEY"]
+    if not key:
+        return api_error("SERVICE_UNAVAILABLE", "Room search is not configured yet.", 503)
+    try:
+        with requests.get(
+            app.config["AVAILABILITY_URL"].rstrip("/") + "/internal/rooms",
+            params=params,
+            headers={"X-Internal-Key": key},
+            timeout=app.config["AVAILABILITY_TIMEOUT"],
+            allow_redirects=False,
+        ) as response:
+            if response.status_code != 200:
+                return api_error("SERVICE_UNAVAILABLE", "Room search is temporarily unavailable.", 503)
+            data = response.json()
+    except (requests.RequestException, ValueError):
+        return api_error("SERVICE_UNAVAILABLE", "Room search is temporarily unavailable.", 503)
+    if (not isinstance(data, dict) or not isinstance(data.get("rooms"), list)
+            or not all(valid_room(room, params["guest_count"]) for room in data["rooms"])):
+        return api_error("SERVICE_UNAVAILABLE", "Availability returned invalid room data.", 503)
+    fields = ("room_id", "room_number", "room_type", "capacity", "price_per_night_cents", "currency")
+    return {"rooms": [{field: room[field] for field in fields} for room in data["rooms"]]}
 
 
 @app.before_request
