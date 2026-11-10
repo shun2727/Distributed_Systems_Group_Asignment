@@ -8,7 +8,7 @@ import unittest
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-import test_auth as auth_tests
+import test_support as support
 
 
 class BookingStub(BaseHTTPRequestHandler):
@@ -54,8 +54,7 @@ class BookingStub(BaseHTTPRequestHandler):
                 return self.reply(409, {"error": {"code": "RESERVATION_RELEASED"}})
             first = data["booking_id"] not in self.server.reservations
             reservation = self.server.reservations.setdefault(data["booking_id"], dict(
-                data, reservation_id="RS_" + data["booking_id"], status="reserved",
-                total_price_cents=24000, currency="MYR"))
+                data, status="reserved"))
             if self.server.lose_reply:
                 self.server.lose_reply = False
                 self.connection.shutdown(socket.SHUT_RDWR)
@@ -83,7 +82,7 @@ class BookingStub(BaseHTTPRequestHandler):
 class BookingCreateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        auth_tests.AuthTests.setUpClass.__func__(cls)
+        support.DatabaseTests.setUpClass.__func__(cls)
         cls.module.init_db()
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), BookingStub)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -94,21 +93,17 @@ class BookingCreateTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=2)
-        auth_tests.AuthTests.tearDownClass.__func__(cls)
+        support.DatabaseTests.tearDownClass.__func__(cls)
 
-    register = auth_tests.AuthTests.register
-    login = auth_tests.AuthTests.login
 
     def setUp(self):
         with closing(sqlite3.connect(self.db_path)) as db, db:
             for name in ("notification_events", "booking_requests"):
                 if db.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone():
                     db.execute(f"DELETE FROM {name}")
-        auth_tests.AuthTests.setUp(self)
-        self.customer_id = self.register().json["customer_id"]
-        self.token = self.login().json["token"]
+        support.DatabaseTests.setUp(self)
         self.key = str(uuid.uuid4())
-        self.payload = {"room_id": "R101", "check_in": "2026-11-10", "check_out": "2026-11-12", "guest_count": 2}
+        self.payload = {"guest_name": "Alex Tan", "room_id": "R101", "check_in": "2026-11-10", "check_out": "2026-11-12", "guest_count": 2}
         self.server.lock = threading.Lock()
         self.server.calls = []
         self.server.reservations = {}
@@ -121,18 +116,18 @@ class BookingCreateTests(unittest.TestCase):
 
     def create(self, key=None, payload=None, client=None):
         return (client or self.client).post("/api/bookings", json=payload or self.payload,
-            headers={"X-Customer-Token": self.token, "Idempotency-Key": key or self.key})
+            headers={"Idempotency-Key": key or self.key})
 
     def test_create_confirms_and_sends_notification(self):
         response = self.create()
         self.assertEqual(response.status_code, 201)
         booking = response.json
         self.assertEqual(booking["status"], "confirmed")
-        self.assertEqual(booking["customer_id"], self.customer_id)
-        self.assertEqual(booking["total_price_cents"], 24000)
+        self.assertEqual(booking["guest_name"], "Alex Tan")
+        self.assertEqual(next(iter(self.server.events.values()))["guest_name"], "Alex Tan")
         self.assertEqual(booking["notification_status"], "sent")
         self.assertEqual(len(self.server.events), 1)
-        self.assertEqual(set(booking), {"booking_id", "reservation_id", "customer_id", "room_id", "check_in", "check_out", "guest_count", "status", "total_price_cents", "currency", "notification_status", "created_at", "updated_at"})
+        self.assertEqual(set(booking), {"booking_id", "guest_name", "room_id", "check_in", "check_out", "guest_count", "status", "notification_status", "created_at", "updated_at"})
         for _, _, _, headers in self.server.calls:
             self.assertEqual(headers["X-Internal-Key"], "test-key")
             self.assertNotIn("X-Customer-Token", headers)
@@ -172,7 +167,7 @@ class BookingCreateTests(unittest.TestCase):
         self.assertEqual(self.create().status_code, 202)
         self.server.availability_down = False
         self.module.booking_workflow.retry_once()
-        found = self.client.get("/api/bookings/" + first.json["booking_id"], headers={"X-Customer-Token": self.token})
+        found = self.client.get("/api/bookings/" + first.json["booking_id"])
         self.assertEqual(found.json["status"], "confirmed")
         self.assertEqual(len(self.server.reservations), 1)
 
@@ -200,16 +195,16 @@ class BookingCreateTests(unittest.TestCase):
         self.assertEqual(next(iter(self.server.events)), sent_ids[0])
         self.assertEqual(self.create().json["notification_status"], "sent")
 
-    def test_view_is_owner_only(self):
+    def test_view_by_id_needs_no_login(self):
         first = self.create()
-        self.register("bob")
-        bob_token = self.login("bob").json["token"]
         url = "/api/bookings/" + first.json["booking_id"]
-        self.assertEqual(self.client.get(url, headers={"X-Customer-Token": bob_token}).status_code, 404)
-        self.assertEqual(self.client.get(url, headers={"X-Customer-Token": self.token}).status_code, 200)
+        self.assertEqual(self.client.get(url).json, first.json)
+        self.assertEqual(self.client.get("/api/bookings/missing").status_code, 404)
 
     def test_invalid_create_never_calls_services(self):
-        cases = [dict(self.payload, guest_count=True), dict(self.payload, guest_count="2"),
+        cases = [dict(self.payload, guest_name=""), dict(self.payload, guest_name="   "),
+            dict(self.payload, guest_name=None), dict(self.payload, guest_name="x" * 101),
+            dict(self.payload, guest_count=True), dict(self.payload, guest_count="2"),
             dict(self.payload, guest_count=9), dict(self.payload, check_in="2026-02-30"),
             dict(self.payload, check_out="2026-11-10"), dict(self.payload, check_out="2026-12-11"),
             dict(self.payload, customer_id="someone-else"), dict(self.payload, total_price_cents=1)]
@@ -217,10 +212,10 @@ class BookingCreateTests(unittest.TestCase):
             self.assertEqual(self.create(payload=payload).status_code, 400)
         self.assertEqual(self.create(key="not-a-uuid").status_code, 400)
         self.assertEqual(self.client.post("/api/bookings", json=self.payload,
-            headers={"X-Customer-Token": self.token}).status_code, 400)
-        self.assertEqual(self.client.post("/api/bookings", json=self.payload).status_code, 401)
+            headers={}).status_code, 400)
+        self.assertEqual(self.client.post("/api/bookings", json=self.payload).status_code, 400)
         self.assertEqual(self.client.post("/api/bookings", data="no-json",
-            headers={"X-Customer-Token": self.token, "Idempotency-Key": self.key}).status_code, 415)
+            headers={"Idempotency-Key": self.key}).status_code, 415)
         self.assertEqual(self.server.calls, [])
 
     def test_bad_reservation_reply_cannot_confirm(self):
@@ -254,14 +249,12 @@ class BookingCreateTests(unittest.TestCase):
         self.assertEqual(self.create().json["status"], "cancelled")
         self.assertEqual(len(self.server.events), 0)
 
-    def test_same_key_is_separate_for_different_customers(self):
-        alice = self.create()
-        self.register("bob")
-        bob_token = self.login("bob").json["token"]
-        bob = self.client.post("/api/bookings", json=self.payload,
-            headers={"X-Customer-Token": bob_token, "Idempotency-Key": self.key})
-        self.assertEqual(bob.status_code, 201)
-        self.assertNotEqual(alice.json["booking_id"], bob.json["booking_id"])
+    def test_same_key_is_global(self):
+        first = self.create()
+        replay = self.create(client=self.module.app.test_client())
+        self.assertEqual(replay.json["booking_id"], first.json["booking_id"])
+        changed = self.create(payload=dict(self.payload, guest_name="Another Guest"))
+        self.assertEqual(changed.status_code, 409)
 
     def test_saved_pending_event_survives_workflow_restart(self):
         self.server.notification_down = True
@@ -279,7 +272,7 @@ class BookingCreateTests(unittest.TestCase):
         self.server.availability_down = True
         first = self.create()
         booking = first.json
-        reservation = dict(booking, reservation_id="RS001", status="reserved", total_price_cents=24000)
+        reservation = dict(booking, status="reserved")
         with closing(sqlite3.connect(self.db_path)) as db, db:
             db.execute("UPDATE bookings SET status='cancelled'")
         self.module.booking_workflow.confirm(booking, reservation)

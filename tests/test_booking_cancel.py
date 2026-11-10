@@ -15,24 +15,21 @@ class BookingCancelTests(unittest.TestCase):
     def tearDownClass(cls):
         creation.BookingCreateTests.tearDownClass.__func__(cls)
 
-    register = creation.BookingCreateTests.register
-    login = creation.BookingCreateTests.login
     create = creation.BookingCreateTests.create
 
     def setUp(self):
         creation.BookingCreateTests.setUp(self)
         self.server.lose_release_reply = self.server.bad_release_reply = False
 
-    def cancel(self, booking_id, token=None, client=None):
-        return (client or self.client).post(f"/api/bookings/{booking_id}/cancel",
-            headers={"X-Customer-Token": token or self.token})
+    def cancel(self, booking_id, client=None):
+        return (client or self.client).post(f"/api/bookings/{booking_id}/cancel")
 
     def test_cancel_releases_then_preserves_order_details(self):
         original = self.create().json
         response = self.cancel(original["booking_id"])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["status"], "cancelled")
-        for key in ("booking_id", "reservation_id", "customer_id", "room_id", "total_price_cents", "created_at"):
+        for key in ("booking_id", "guest_name", "room_id", "created_at"):
             self.assertEqual(response.json[key], original[key])
         self.assertEqual(self.server.reservations[original["booking_id"]]["status"], "released")
         release = [c for c in self.server.calls if c[1].endswith("/release")][0]
@@ -50,16 +47,10 @@ class BookingCancelTests(unittest.TestCase):
         self.assertEqual(replay.json["status"], "cancelled")
         self.assertEqual(len(self.server.events), 1)
 
-    def test_cannot_cancel_another_customer_or_unknown_order(self):
+    def test_cancel_by_id_needs_no_login(self):
         booking_id = self.create().json["booking_id"]
-        self.register("bob")
-        bob = self.login("bob").json["token"]
-        before = len(self.server.calls)
-        self.assertEqual(self.cancel(booking_id, bob).status_code, 404)
         self.assertEqual(self.cancel("missing").status_code, 404)
-        self.assertEqual(self.client.post(f"/api/bookings/{booking_id}/cancel").status_code, 401)
-        self.assertEqual(len(self.server.calls), before)
-        self.assertEqual(self.module.booking_workflow.get_booking(booking_id)["status"], "confirmed")
+        self.assertEqual(self.client.post(f"/api/bookings/{booking_id}/cancel").status_code, 200)
 
     def test_pending_cannot_be_cancelled(self):
         self.server.availability_down = True
@@ -70,12 +61,12 @@ class BookingCancelTests(unittest.TestCase):
         self.assertEqual(response.json["booking_id"], booking_id)
         self.assertEqual(len([c for c in self.server.calls if c[1].endswith("/release")]), 0)
 
-    def test_rejected_cancel_returns_unchanged_booking(self):
+    def test_rejected_booking_cannot_be_cancelled(self):
         self.server.reject = True
         booking_id = self.create().json["booking_id"]
         response = self.cancel(booking_id)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["status"], "rejected")
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json["error"]["code"], "BOOKING_STATE_CONFLICT")
         self.assertEqual(len([c for c in self.server.calls if c[1].endswith("/release")]), 0)
 
     def test_outage_stays_cancelling_until_recovery(self):
@@ -114,8 +105,7 @@ class BookingCancelTests(unittest.TestCase):
     def test_cancel_has_no_request_body(self):
         booking_id = self.create().json["booking_id"]
         before = len(self.server.calls)
-        response = self.client.post(f"/api/bookings/{booking_id}/cancel", json={"status": "cancelled"},
-                                   headers={"X-Customer-Token": self.token})
+        response = self.client.post(f"/api/bookings/{booking_id}/cancel", json={"status": "cancelled"})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(len(self.server.calls), before)
 

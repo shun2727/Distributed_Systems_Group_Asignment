@@ -32,7 +32,9 @@ def error_reply(code, message, status, booking_id=None):
 
 
 def valid_booking(data):
-    if not isinstance(data, dict) or set(data) != set(FIELDS):
+    if not isinstance(data, dict) or set(data) != set(FIELDS) | {"guest_name"}:
+        return False
+    if not isinstance(data["guest_name"], str) or not 1 <= len(data["guest_name"].strip()) <= 100:
         return False
     if not isinstance(data["room_id"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", data["room_id"]):
         return False
@@ -49,16 +51,14 @@ def valid_booking(data):
 
 
 def init_workflow_tables(db):
-    # One request key per customer, saved together with its booking.
+    # One global request key, saved together with its booking.
     db.execute("""CREATE TABLE IF NOT EXISTS booking_requests (
-        customer_id TEXT NOT NULL,
-        request_key TEXT NOT NULL,
+        request_key TEXT PRIMARY KEY,
         payload_json TEXT NOT NULL,
         booking_id TEXT NOT NULL UNIQUE REFERENCES bookings(booking_id),
         error_code TEXT,
         error_status INTEGER,
-        error_message TEXT,
-        PRIMARY KEY (customer_id, request_key)
+        error_message TEXT
     )""")
     # A saved event survives a notification outage or process restart.
     db.execute("""CREATE TABLE IF NOT EXISTS notification_events (
@@ -78,13 +78,10 @@ class BookingWorkflow:
         self.worker_started = False
         self.logger = logging.getLogger(__name__)
 
-    def get_booking(self, booking_id, customer_id=None):
+    def get_booking(self, booking_id):
         db = self.get_db()
         try:
             sql, params = "SELECT * FROM bookings WHERE booking_id = ?", [booking_id]
-            if customer_id is not None:
-                sql += " AND customer_id = ?"
-                params.append(customer_id)
             row = db.execute(sql, params).fetchone()
             return dict(row) if row else None
         finally:
@@ -103,7 +100,7 @@ class BookingWorkflow:
             return booking, 202
         return booking, 201 if new and booking["status"] == "confirmed" else 200
 
-    def submit(self, customer_id, data, request_key):
+    def submit(self, data, request_key):
         payload = json.dumps(data, sort_keys=True, separators=(",", ":"))
         db = self.get_db()
         try:
@@ -111,8 +108,8 @@ class BookingWorkflow:
             with db:
                 db.execute("BEGIN IMMEDIATE")
                 saved = db.execute(
-                    "SELECT * FROM booking_requests WHERE customer_id = ? AND request_key = ?",
-                    (customer_id, request_key),
+                    "SELECT * FROM booking_requests WHERE request_key = ?",
+                    (request_key,),
                 ).fetchone()
                 if saved:
                     if saved["payload_json"] != payload:
@@ -122,14 +119,14 @@ class BookingWorkflow:
                     booking_id, new = uuid.uuid4().hex, True
                     now = timestamp()
                     db.execute("""INSERT INTO bookings (
-                        booking_id, customer_id, room_id, check_in, check_out, guest_count,
-                        status, reservation_id, total_price_cents, currency,
-                        notification_status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, 'MYR', 'pending', ?, ?)""",
-                        (booking_id, customer_id, data["room_id"], data["check_in"], data["check_out"], data["guest_count"], now, now))
+                        booking_id, guest_name, room_id, check_in, check_out, guest_count,
+                        status, notification_status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?)""",
+                        (booking_id, data["guest_name"], data["room_id"], data["check_in"],
+                         data["check_out"], data["guest_count"], now, now))
                     db.execute("""INSERT INTO booking_requests
-                        (customer_id, request_key, payload_json, booking_id) VALUES (?, ?, ?, ?)""",
-                        (customer_id, request_key, payload, booking_id))
+                        (request_key, payload_json, booking_id) VALUES (?, ?, ?)""",
+                        (request_key, payload, booking_id))
         finally:
             db.close()
         if new:
@@ -137,19 +134,19 @@ class BookingWorkflow:
             self.send_notifications(booking_id)
         return self.result(booking_id, new)
 
-    def cancel(self, booking_id, customer_id):
+    def cancel(self, booking_id):
         db = self.get_db()
         try:
             with db:
                 db.execute("BEGIN IMMEDIATE")
-                row = db.execute("SELECT * FROM bookings WHERE booking_id=? AND customer_id=?",
-                                 (booking_id, customer_id)).fetchone()
+                row = db.execute("SELECT * FROM bookings WHERE booking_id=?",
+                                 (booking_id,)).fetchone()
                 if row is None:
                     return error_reply("NOT_FOUND", "Booking not found.", 404)
                 booking = dict(row)
-                if booking["status"] == "pending":
-                    return error_reply("BOOKING_STATE_CONFLICT", "Wait for the pending booking result before cancelling.", 409, booking_id)
-                if booking["status"] in ("cancelled", "rejected"):
+                if booking["status"] in ("pending", "rejected"):
+                    return error_reply("BOOKING_STATE_CONFLICT", "Only a confirmed booking can be cancelled.", 409, booking_id)
+                if booking["status"] == "cancelled":
                     return booking, 200
                 if booking["status"] == "cancelling":
                     return booking, 202
@@ -203,25 +200,18 @@ class BookingWorkflow:
             and reply.get("status") == "reserved"
             and all(reply.get(k) == booking[k] for k in FIELDS)
             and type(reply.get("guest_count")) is int
-            and isinstance(reply.get("reservation_id"), str)
-            and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", reply["reservation_id"]) is not None
-            and type(reply.get("total_price_cents")) is int
-            and reply["total_price_cents"] >= 0
-            and reply.get("currency") == "MYR"
         )
 
     def confirm(self, booking, reservation):
         db = self.get_db()
         try:
             with db:
-                changed = db.execute("""UPDATE bookings SET status = 'confirmed',
-                    reservation_id = ?, total_price_cents = ?, currency = ?, updated_at = ?
+                changed = db.execute("""UPDATE bookings SET status = 'confirmed', updated_at = ?
                     WHERE booking_id = ? AND status = 'pending'""",
-                    (reservation["reservation_id"], reservation["total_price_cents"],
-                     reservation["currency"], timestamp(), booking["booking_id"])).rowcount
+                    (timestamp(), booking["booking_id"])).rowcount
                 if changed:
                     event_id = uuid.uuid4().hex
-                    event = {k: booking[k] for k in ("booking_id", "customer_id", "room_id", "check_in", "check_out")}
+                    event = {k: booking[k] for k in ("booking_id", "guest_name", "room_id", "check_in", "check_out")}
                     event.update(event_id=event_id, event_type="booking.confirmed")
                     db.execute("INSERT INTO notification_events (event_id, booking_id, payload_json) VALUES (?, ?, ?)",
                                (event_id, booking["booking_id"], json.dumps(event)))

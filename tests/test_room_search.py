@@ -6,11 +6,11 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-import test_auth as auth_tests
+import test_support as support
 
 
 ROOM = {"room_id": "R101", "room_number": "101", "room_type": "standard",
-        "capacity": 2, "price_per_night_cents": 12000, "currency": "MYR"}
+        "capacity": 2}
 
 
 class AvailabilityStub(BaseHTTPRequestHandler):
@@ -34,7 +34,7 @@ class AvailabilityStub(BaseHTTPRequestHandler):
 class RoomSearchTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        auth_tests.AuthTests.setUpClass.__func__(cls)
+        support.DatabaseTests.setUpClass.__func__(cls)
         # Another test class may have imported the app with its own temporary path.
         cls.module.init_db()
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), AvailabilityStub)
@@ -46,15 +46,12 @@ class RoomSearchTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=2)
-        auth_tests.AuthTests.tearDownClass.__func__(cls)
+        support.DatabaseTests.tearDownClass.__func__(cls)
 
-    register = auth_tests.AuthTests.register
-    login = auth_tests.AuthTests.login
 
     def setUp(self):
-        auth_tests.AuthTests.setUp(self)
-        self.register()
-        self.headers = {"X-Customer-Token": self.login().json["token"]}
+        support.DatabaseTests.setUp(self)
+        self.headers = {}
         self.params = {"check_in": "2026-11-10", "check_out": "2026-11-12", "guest_count": "2"}
         self.server.calls = []
         self.server.delay = 0
@@ -82,11 +79,9 @@ class RoomSearchTests(unittest.TestCase):
         self.server.reply_body = b'{"rooms": []}'
         self.assertEqual(self.search().json, {"rooms": []})
 
-    def test_requires_login_before_contacting_availability(self):
-        for headers in ({}, {"X-Customer-Token": "wrong"}):
-            response = self.client.get("/api/rooms", query_string=self.params, headers=headers)
-            self.assertEqual(response.status_code, 401)
-        self.assertEqual(self.server.calls, [])
+    def test_search_needs_no_login(self):
+        response = self.client.get("/api/rooms", query_string=self.params)
+        self.assertEqual(response.status_code, 200)
 
     def test_validates_query_before_contacting_availability(self):
         cases = [dict(self.params, check_in="2026-02-30"),
@@ -132,7 +127,7 @@ class RoomSearchTests(unittest.TestCase):
                              (302, b''), (200, b'not-json'), (200, b'[]'),
                              (200, b'{"rooms": null}'), (200, b'{"rooms": [{}]}'),
                              (200, json.dumps({"rooms": [dict(ROOM, capacity=True)]}).encode()),
-                             (200, json.dumps({"rooms": [dict(ROOM, price_per_night_cents=-1)]}).encode())]:
+                             (200, json.dumps({"rooms": [dict(ROOM, room_id="invalid/id")]}).encode())]:
             self.server.reply_status, self.server.reply_body = status, body
             response = self.search()
             self.assertEqual(response.status_code, 503, body)
