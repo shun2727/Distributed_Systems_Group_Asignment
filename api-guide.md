@@ -2,7 +2,7 @@
 
 10 November 2026 â€” simplified team contract.
 
-**Implementation status:** Booking implements this simplified contract locally and has been tested with temporary HTTP services. Client, Availability and Notification must use this version for real-service integration.
+**Implementation status:** The Booking APIs below match the current Booking code and have been tested with temporary HTTP services. Availability and Notification endpoints describe the expected integration contract; their real implementations and Client integration still need to be checked with teammates.
 
 ## 1. Connections and scope
 
@@ -118,7 +118,9 @@ No internal API key is required. Availability owns inventory.
 {"booking_id": "B001", "room_id": "R101", "check_in": "2026-11-15", "check_out": "2026-11-17", "guest_count": 2, "status": "reserved"}
 ```
 
-Overlap â†’ 409 ROOM_UNAVAILABLE. Changed input with same ID â†’ 409 IDEMPOTENCY_CONFLICT. Released ID â†’ 409 RESERVATION_RELEASED. Unknown room â†’ 404. Guests above room capacity â†’ 400.
+Overlap â†’ 409 ROOM_UNAVAILABLE. Changed input with same ID â†’ 409 IDEMPOTENCY_CONFLICT. Released ID â†’ 409 RESERVATION_RELEASED. Unknown room: 404 NOT_FOUND. Guests above room capacity: 400 VALIDATION_ERROR.
+
+Error replies must include the matching error code, for example `{"error":{"code":"VALIDATION_ERROR","message":"Guest count exceeds room capacity."}}`. Booking checks both the HTTP status and error code before rejecting an order; an unexpected reply leaves it pending for recovery.
 
 Insert reservation and all occupied nights in one transaction, using UNIQUE(room_id, stay_date). Any conflict rolls back the entire stay. Release nights and mark released together too.
 
