@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stay Desk: hotel booking</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <h1>Stay Desk</h1>
+  <p class="service">
+    <span class="dot" id="dot"></span>
+    <span id="service-text">Checking booking service...</span>
+  </p>
+</header>
+
+<main>
+  <!-- Two tabs: book a new stay, or look up an existing booking -->
+  <div class="tabs" role="tablist" aria-label="What do you want to do?">
+    <button type="button" role="tab" id="tab-book" aria-selected="true" aria-controls="panel-book">Book a stay</button>
+    <button type="button" role="tab" id="tab-manage" aria-selected="false" aria-controls="panel-manage">Find a booking</button>
+  </div>
+
+  <!-- TAB 1: search, choose a room, book -->
+  <section id="panel-book" role="tabpanel" aria-labelledby="tab-book">
+    <div class="grid">
+      <form id="search-form" class="card" novalidate>
+        <h2>When are you staying?</h2>
+        <label for="check_in">Check-in</label>
+        <input type="date" id="check_in" required>
+
+        <label for="check_out">Check-out</label>
+        <input type="date" id="check_out" required>
+
+        <label for="guest_count">Guests</label>
+        <input type="number" id="guest_count" min="1" max="8" value="2" required>
+
+        <button type="submit" class="btn" id="search-btn">Find rooms</button>
+      </form>
+
+      <div class="results">
+        <div id="rooms" aria-live="polite"></div>
+
+        <form id="book-form" class="card" hidden novalidate>
+          <h2>Your details</h2>
+          <p id="book-summary" class="summary"></p>
+          <label for="guest_name">Guest name</label>
+          <input type="text" id="guest_name" maxlength="60" autocomplete="name" required>
+          <div class="actions">
+            <button type="submit" class="btn" id="book-btn">Confirm booking</button>
+            <button type="button" class="btn ghost" id="book-back">Choose another room</button>
+          </div>
+        </form>
+
+        <div id="book-result" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 2: view and cancel a booking by its ID -->
+  <section id="panel-manage" role="tabpanel" aria-labelledby="tab-manage" hidden>
+    <div class="grid">
+      <form id="manage-form" class="card" novalidate>
+        <h2>Look up a booking</h2>
+        <label for="booking_id">Booking ID</label>
+        <input type="text" id="booking_id" placeholder="B001" maxlength="64" required>
+        <button type="submit" class="btn" id="manage-btn">View booking</button>
+      </form>
+      <div id="manage-result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- Shows every API call this page makes. Good for learning and for report screenshots. -->
+  <details class="log" open>
+    <summary>Request log <span id="log-count" class="count">0</span></summary>
+    <p class="hint">Every call this page sends to the Booking service appears here, newest first. Open an entry to see the headers, the JSON sent and the reply.</p>
+    <p id="log-empty" class="note info">No requests yet. Click "Find rooms" above and the call will appear here.</p>
+    <ol id="log-list" class="log-list"></ol>
+  </details>
+</main>
+
+<!-- Order matters: each file uses the one above it -->
+<script src="js/config.js"></script>
+<script src="js/mock.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
