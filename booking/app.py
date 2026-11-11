@@ -72,9 +72,9 @@ def api_error(code, message, status):
     return {"error": {"code": code, "message": message}}, status
 
 
-# Check the dates and guest count before asking Availability.
+# Check the dates and room type before asking Availability.
 def read_room_search():
-    fields = {"check_in", "check_out", "guest_count"}
+    fields = {"check_in", "check_out", "room_type"}
     if set(request.args) != fields or any(len(request.args.getlist(k)) != 1 for k in fields):
         return None
     values = request.args.to_dict()
@@ -90,22 +90,21 @@ def read_room_search():
         return None
     if check_out <= check_in:
         return None
-    if not re.fullmatch(r"[0-9]+", values["guest_count"]):
+    if values["room_type"] not in {"single", "double", "king_suite"}:
         return None
-    values["guest_count"] = int(values["guest_count"])
-    return values if values["guest_count"] > 0 else None
+    return values
 
 
 # Reject incomplete room data instead of reporting a false search result.
-def valid_room(room, guest_count):
+def valid_room(room, room_type):
     return (
         isinstance(room, dict)
         and isinstance(room.get("room_id"), str)
         and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", room["room_id"]) is not None
         and isinstance(room.get("room_number"), str)
-        and isinstance(room.get("room_type"), str)
+        and room.get("room_type") == room_type
         and type(room.get("capacity")) is int
-        and guest_count <= room["capacity"]
+        and room["capacity"] > 0
     )
 
 
@@ -114,7 +113,7 @@ def valid_room(room, guest_count):
 def search_rooms():
     params = read_room_search()
     if params is None:
-        return api_error("VALIDATION_ERROR", "Send valid dates with check_out after check_in, and a positive integer guest_count.", 400)
+        return api_error("VALIDATION_ERROR", "Send valid dates with check_out after check_in, and room_type: single, double or king_suite.", 400)
     try:
         with requests.get(
             app.config["AVAILABILITY_URL"].rstrip("/") + "/internal/rooms",
@@ -128,7 +127,7 @@ def search_rooms():
     except (requests.RequestException, ValueError):
         return api_error("SERVICE_UNAVAILABLE", "Room search is temporarily unavailable.", 503)
     if (not isinstance(data, dict) or not isinstance(data.get("rooms"), list)
-            or not all(valid_room(room, params["guest_count"]) for room in data["rooms"])):
+            or not all(valid_room(room, params["room_type"]) for room in data["rooms"])):
         return api_error("SERVICE_UNAVAILABLE", "Availability returned invalid room data.", 503)
     fields = ("room_id", "room_number", "room_type", "capacity")
     return {"rooms": [{field: room[field] for field in fields} for room in data["rooms"]]}

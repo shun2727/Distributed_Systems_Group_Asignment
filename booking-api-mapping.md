@@ -4,18 +4,18 @@ A short guide for connecting the Client UI to Booking.
 Base URL: `http://localhost:5001`.
 
 This describes the current local Booking implementation. Real-service integration is still to be tested.
-**Room-type search is not implemented yet:** search currently requires dates and guest count. The team plans Single, Double and King Suite, three rooms each; Availability owns that inventory. Agree on room-type values before changing the search API.
+Search uses check-in date, check-out date and room type. API values: `single` (Single), `double` (Double), `king_suite` (King Suite). Availability owns the sample inventory: three rooms of each type. These values must also be supported by the Client and Availability services.
 
 ## 1. Search rooms
 
-`GET /api/rooms?check_in=2026-11-15&check_out=2026-11-17&guest_count=2`
+`GET /api/rooms?check_in=2026-11-15&check_out=2026-11-17&room_type=double`
 
 No request body. Booking forwards these parameters to Availability.
 
 200 response (room values below are examples):
 
 ```json
-{"rooms": [{"room_id": "R101", "room_number": "101", "room_type": "standard", "capacity": 2}]}
+{"rooms": [{"room_id": "R101", "room_number": "101", "room_type": "double", "capacity": 2}]}
 ```
 
 - No rooms available: `200` with `{"rooms": []}`. Show "No rooms available."

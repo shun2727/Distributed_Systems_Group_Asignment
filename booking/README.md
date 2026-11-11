@@ -4,6 +4,8 @@ Implements the simplified v2 API in ../api-guide.md: room search, create, view, 
 
 Booking calls Availability and Notification over HTTP. Local tests use temporary HTTP services; real teammate services still need integration.
 
+Room search uses dates and `room_type`: `single`, `double` or `king_suite`. Creation still needs `guest_count` so Availability can check capacity. Availability must support the same search parameters.
+
 ## Run
 
 From the repository root:
@@ -31,7 +33,7 @@ Health and search:
 
 ```powershell
 Invoke-RestMethod http://localhost:5001/health
-Invoke-RestMethod "http://localhost:5001/api/rooms?check_in=2026-11-15&check_out=2026-11-17&guest_count=2"
+Invoke-RestMethod "http://localhost:5001/api/rooms?check_in=2026-11-15&check_out=2026-11-17&room_type=double"
 ```
 
 Create and view:
@@ -89,4 +91,4 @@ python -m unittest discover -s tests -v
 
 Tests use isolated temporary databases and HTTP stubs. They cover simplified field validation, no-login APIs, request deduplication, concurrency, lost replies, cancellation, notification outages and restart recovery. They do not prove the teammate's inventory implementation prevents conflicting bookings; test that with real services during integration.
 
-No authenticated ownership enforcement: anyone knowing an ID can view or cancel that booking. Use demo data and do not expose a public booking list. Input validation, parameterized SQL, internal keys, CORS and bounded request bodies remain enabled.
+No authenticated ownership enforcement: anyone knowing an ID can view or cancel that booking. Use demo data and do not expose a public booking list. Input validation, parameterized SQL, CORS and bounded request bodies remain enabled.

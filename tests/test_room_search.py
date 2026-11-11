@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 import test_support as support
 
 
-ROOM = {"room_id": "R101", "room_number": "101", "room_type": "standard",
+ROOM = {"room_id": "R101", "room_number": "101", "room_type": "double",
         "capacity": 2}
 
 
@@ -52,7 +52,7 @@ class RoomSearchTests(unittest.TestCase):
     def setUp(self):
         support.DatabaseTests.setUp(self)
         self.headers = {}
-        self.params = {"check_in": "2026-11-10", "check_out": "2026-11-12", "guest_count": "2"}
+        self.params = {"check_in": "2026-11-10", "check_out": "2026-11-12", "room_type": "double"}
         self.server.calls = []
         self.server.delay = 0
         self.server.reply_status = 200
@@ -75,6 +75,16 @@ class RoomSearchTests(unittest.TestCase):
         self.assertNotIn("X-Internal-Key", headers)
         self.assertNotIn("X-Customer-Token", headers)
 
+    def test_all_three_room_types_are_forwarded(self):
+        for room_type in ("single", "double", "king_suite"):
+            room = dict(ROOM, room_type=room_type)
+            self.server.reply_body = json.dumps({"rooms": [room]}).encode()
+            response = self.search(**dict(self.params, room_type=room_type))
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json, {"rooms": [room]})
+            path, _ = self.server.calls[-1]
+            self.assertEqual(parse_qs(urlparse(path).query)["room_type"], [room_type])
+
     def test_empty_room_list_is_success(self):
         self.server.reply_body = b'{"rooms": []}'
         self.assertEqual(self.search().json, {"rooms": []})
@@ -88,19 +98,19 @@ class RoomSearchTests(unittest.TestCase):
                  dict(self.params, check_in="20261110"),
                  dict(self.params, check_out="2026-11-10"),
                  dict(self.params, check_out="2026-11-09"),
-                 dict(self.params, guest_count="0"), dict(self.params, guest_count="-1"),
-                 dict(self.params, guest_count="2.0"), dict(self.params, guest_count="true"),
+                 dict(self.params, room_type=""), dict(self.params, room_type="standard"),
+                 dict(self.params, room_type="Double"), dict(self.params, guest_count="2"),
                  dict(self.params, extra="unexpected"), {"check_in": "2026-11-10"}]
         for params in cases:
             response = self.search(**params)
             self.assertEqual(response.status_code, 400, params)
             self.assertEqual(response.json["error"]["code"], "VALIDATION_ERROR")
-        duplicate = list(self.params.items()) + [("guest_count", "3")]
+        duplicate = list(self.params.items()) + [("room_type", "single")]
         self.assertEqual(self.client.get("/api/rooms", query_string=duplicate, headers=self.headers).status_code, 400)
         self.assertEqual(self.server.calls, [])
 
     def test_stays_longer_than_thirty_nights_are_allowed(self):
-        response = self.search(check_in="2026-11-10", check_out="2026-12-20", guest_count="2")
+        response = self.search(check_in="2026-11-10", check_out="2026-12-20", room_type="double")
         self.assertEqual(response.status_code, 200)
 
     def test_no_key_configuration_is_needed(self):
@@ -126,6 +136,8 @@ class RoomSearchTests(unittest.TestCase):
                              (302, b''), (200, b'not-json'), (200, b'[]'),
                              (200, b'{"rooms": null}'), (200, b'{"rooms": [{}]}'),
                              (200, json.dumps({"rooms": [dict(ROOM, capacity=True)]}).encode()),
+                             (200, json.dumps({"rooms": [dict(ROOM, capacity=0)]}).encode()),
+                             (200, json.dumps({"rooms": [dict(ROOM, room_type="single")]}).encode()),
                              (200, json.dumps({"rooms": [dict(ROOM, room_id="invalid/id")]}).encode())]:
             self.server.reply_status, self.server.reply_body = status, body
             response = self.search()

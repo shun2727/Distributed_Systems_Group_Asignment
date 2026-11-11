@@ -33,19 +33,19 @@ Client (website, port 3000) â†’ Booking (5001) â†’ Availability (5002)
 - JSON body: `Content-Type: application/json`.
 - Create booking: also send `Idempotency-Key: <UUID>`. One UUID per new attempt; reuse it for retries of the same attempt.
 - Backend calls need no internal API key in this local demo.
-- Client sends neither a customer token nor the internal key.
+- No customer token or internal API key is needed.
 - GET, cancel and release requests have no body.
 
 ## 2. Client â†’ Booking
 
 ### Search
 
-`GET /api/rooms?check_in=2026-11-15&check_out=2026-11-17&guest_count=2`
+`GET /api/rooms?check_in=2026-11-15&check_out=2026-11-17&room_type=double`
 
-Booking forwards the same parameters to `GET /internal/rooms`. Both return **200** with this format:
+Search requires `check_in`, `check_out` and `room_type` (`single`, `double` or `king_suite`); it does not take guest_count. Booking forwards the same parameters to `GET /internal/rooms`. Both return **200** with this format:
 
 ```json
-{"rooms": [{"room_id": "R101", "room_number": "101", "room_type": "standard", "capacity": 2}]}
+{"rooms": [{"room_id": "R101", "room_number": "101", "room_type": "double", "capacity": 2}]}
 ```
 
 No match: `200 {"rooms": []}`. Search does not reserve rooms. Availability unavailable â†’ 503, not an empty list.
@@ -169,6 +169,7 @@ A notification records confirmation history; Booking is the source of current or
 | IDs | Strings, 1â€“64 letters/digits/underscores/hyphens; do not depend on example formats |
 | Dates | Real YYYY-MM-DD; check-in before check-out; past demo dates allowed |
 | Nights | Check-in included, check-out excluded: 15â€“17 November occupies nights 15 and 16 |
+| room_type | Search: single, double or king_suite; Availability owns three sample rooms of each type |
 | guest_count | Positive integer, not boolean/string; Availability checks room capacity |
 | Timestamps | Server-generated UTC ending Z |
 | Booking states | pending, confirmed, rejected, cancelling, cancelled |
@@ -211,7 +212,7 @@ Use availability / notification for other services. Own storage unavailable â�
 - Lost Availability reply: pending order recovers without another reservation.
 - Notification outage/restart: booking remains confirmed; event recorded once.
 - Release outage: cancelling recovers to cancelled; old reserve replies cannot restore it.
-- Invalid inputs and missing/wrong internal keys rejected.
+- Invalid inputs are rejected with clear error responses.
 - Test with real Client and teammate services; label mock-service evidence separately.
 
 ### Shared report changes needed
