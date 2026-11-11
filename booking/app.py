@@ -17,7 +17,6 @@ app.config["DATABASE"] = os.environ.get(
 app.config["WEBSITE_ORIGIN"] = os.environ.get("WEBSITE_ORIGIN", "http://localhost:3000")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 app.config["AVAILABILITY_URL"] = os.environ.get("AVAILABILITY_URL", "http://localhost:5002")
-app.config["INTERNAL_KEY"] = os.environ.get("INTERNAL_KEY", "")
 app.config["AVAILABILITY_TIMEOUT"] = 3
 app.config["NOTIFICATION_URL"] = os.environ.get("NOTIFICATION_URL", "http://localhost:5003")
 app.config["NOTIFICATION_TIMEOUT"] = 3
@@ -89,12 +88,12 @@ def read_room_search():
         check_out = date.fromisoformat(values["check_out"])
     except ValueError:
         return None
-    if not 1 <= (check_out - check_in).days <= 30:
+    if check_out <= check_in:
         return None
-    if not re.fullmatch(r"[0-9]{1,2}", values["guest_count"]):
+    if not re.fullmatch(r"[0-9]+", values["guest_count"]):
         return None
     values["guest_count"] = int(values["guest_count"])
-    return values if 1 <= values["guest_count"] <= 8 else None
+    return values if values["guest_count"] > 0 else None
 
 
 # Reject incomplete room data instead of reporting a false search result.
@@ -106,7 +105,7 @@ def valid_room(room, guest_count):
         and isinstance(room.get("room_number"), str)
         and isinstance(room.get("room_type"), str)
         and type(room.get("capacity")) is int
-        and guest_count <= room["capacity"] <= 8
+        and guest_count <= room["capacity"]
     )
 
 
@@ -115,15 +114,11 @@ def valid_room(room, guest_count):
 def search_rooms():
     params = read_room_search()
     if params is None:
-        return api_error("VALIDATION_ERROR", "Send valid check_in, check_out and guest_count; stay must be 1-30 nights and guests 1-8.", 400)
-    key = app.config["INTERNAL_KEY"]
-    if not key:
-        return api_error("SERVICE_UNAVAILABLE", "Room search is not configured yet.", 503)
+        return api_error("VALIDATION_ERROR", "Send valid dates with check_out after check_in, and a positive integer guest_count.", 400)
     try:
         with requests.get(
             app.config["AVAILABILITY_URL"].rstrip("/") + "/internal/rooms",
             params=params,
-            headers={"X-Internal-Key": key},
             timeout=app.config["AVAILABILITY_TIMEOUT"],
             allow_redirects=False,
         ) as response:
@@ -146,7 +141,7 @@ def create_booking():
         return api_error("UNSUPPORTED_MEDIA_TYPE", "Use application/json.", 415)
     data = request.get_json(silent=True)
     if not valid_booking(data):
-        return api_error("VALIDATION_ERROR", "Send guest_name (1-100 characters), room_id, valid dates (1-30 nights), and integer guest_count (1-8).", 400)
+        return api_error("VALIDATION_ERROR", "Send a non-empty guest_name, room_id, valid dates with check_out after check_in, and a positive integer guest_count.", 400)
     try:
         request_key = str(uuid.UUID(request.headers.get("Idempotency-Key", "")))
     except ValueError:

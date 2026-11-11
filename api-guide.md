@@ -32,7 +32,7 @@ Client (website, port 3000) â†’ Booking (5001) â†’ Availability (5002)
 
 - JSON body: `Content-Type: application/json`.
 - Create booking: also send `Idempotency-Key: <UUID>`. One UUID per new attempt; reuse it for retries of the same attempt.
-- Booking â†’ Availability / Notification: `X-Internal-Key`, configured identically on the backends. Keep the key out of GitHub and the browser.
+- Backend calls need no internal API key in this local demo.
 - Client sends neither a customer token nor the internal key.
 - GET, cancel and release requests have no body.
 
@@ -102,7 +102,7 @@ Poll pending/cancelling bookings with GET every 2 seconds, for up to 30 seconds.
 
 ## 3. Booking â†’ Availability
 
-All calls require X-Internal-Key. Availability owns inventory.
+No internal API key is required. Availability owns inventory.
 
 ### Reserve
 
@@ -142,7 +142,7 @@ Booking saves cancelling before release, then cancelled only after a matching re
 
 ## 4. Booking â†’ Notification
 
-`POST /internal/notifications`, with X-Internal-Key:
+`POST /internal/notifications`:
 
 ```json
 {"event_id": "E001", "event_type": "booking.confirmed", "booking_id": "B001", "guest_name": "Alex Tan", "room_id": "R101", "check_in": "2026-11-15", "check_out": "2026-11-17"}
@@ -156,7 +156,7 @@ Save before replying: **201** first time; **200** for an identical retry:
 
 Same event ID + changed data â†’ 409 IDEMPOTENCY_CONFLICT. Deduplicate persistently by event_id, including after restart. A database or durable log is acceptable if it supports these rules. No email/SMS.
 
-Booking saves confirmation and a pending event in one local transaction. It may try sending before replying to Client; notification failure must not undo confirmation. Retry the saved event with the same ID. Only a matching 200/201 acknowledgement marks notification_status sent. Timeout/5xx stays pending; fix key/schema problems causing 4xx.
+Booking saves confirmation and a pending event in one local transaction. It may try sending before replying to Client; notification failure must not undo confirmation. Retry the saved event with the same ID. Only a matching 200/201 acknowledgement marks notification_status sent. Timeout/5xx stays pending; fix request/schema problems causing 4xx.
 
 A notification records confirmation history; Booking is the source of current order status.
 
@@ -165,11 +165,11 @@ A notification records confirmation history; Booking is the source of current or
 | Item | Rule |
 | --- | --- |
 | JSON | snake_case; example request fields required; reject unknown fields, nulls and malformed JSON |
-| guest_name | String, trimmed, 1â€“100 characters; allow non-ASCII names |
+| guest_name | Non-empty string, trimmed; allow non-ASCII names |
 | IDs | Strings, 1â€“64 letters/digits/underscores/hyphens; do not depend on example formats |
-| Dates | Real YYYY-MM-DD; check-in before check-out; at most 30 nights; past demo dates allowed |
+| Dates | Real YYYY-MM-DD; check-in before check-out; past demo dates allowed |
 | Nights | Check-in included, check-out excluded: 15â€“17 November occupies nights 15 and 16 |
-| guest_count | Integer 1â€“8, not boolean/string; must fit room capacity |
+| guest_count | Positive integer, not boolean/string; Availability checks room capacity |
 | Timestamps | Server-generated UTC ending Z |
 | Booking states | pending, confirmed, rejected, cancelling, cancelled |
 | Notification states | pending, sent; no event is sent before confirmation |
@@ -188,7 +188,6 @@ Add booking_id when an associated order exists; omit otherwise. Client reads cod
 | HTTP | Code |
 | --- | --- |
 | 400 | VALIDATION_ERROR |
-| 401 | UNAUTHORIZED â€” wrong/missing internal key only |
 | 404 / 405 | NOT_FOUND / METHOD_NOT_ALLOWED |
 | 409 | ROOM_UNAVAILABLE, IDEMPOTENCY_CONFLICT, RESERVATION_RELEASED, BOOKING_STATE_CONFLICT |
 | 413 / 415 | VALIDATION_ERROR (body over 16 KiB) / UNSUPPORTED_MEDIA_TYPE |

@@ -10,11 +10,10 @@ From the repository root:
 
 ```powershell
 python -m pip install -r booking/requirements.txt
-$env:INTERNAL_KEY = "replace-with-your-teams-shared-secret"
 python -m flask --app booking.app run --port 5001
 ```
 
-Configure the same private key in Availability and Notification; do not commit it or put it in the website. Restart Flask after changing code or configuration.
+No internal API key is required by Booking. Availability and Notification must also accept these calls without a key. Restart Flask after changing code or configuration.
 
 | Setting | Default |
 | --- | --- |
@@ -51,9 +50,9 @@ $booking = Invoke-RestMethod -Uri 'http://localhost:5001/api/bookings' -Method P
 Invoke-RestMethod "http://localhost:5001/api/bookings/$($booking.booking_id)"
 ```
 
-Reuse the exact key and input to retry the same attempt. New keys mean new attempts. Guest names are trimmed and bounded to 1–100 characters. Booking generates the booking ID.
+Reuse the exact key and input to retry the same attempt. New keys mean new attempts. Guest names are trimmed and must not be empty. Booking generates the booking ID.
 
-Create returns 201 confirmed, 202 pending, or a saved rejection. No key, offline Availability or an unknown reserve outcome leaves a valid new order pending. Search returns 503 when Availability cannot be queried, and 200 with an empty list only when the service reports no matches.
+Create returns 201 confirmed, 202 pending, or a saved rejection. Offline Availability or an unknown reserve outcome leaves a valid new order pending. Search returns 503 when Availability cannot be queried, and 200 with an empty list only when the service reports no matches.
 
 Cancel a confirmed booking, with no body:
 

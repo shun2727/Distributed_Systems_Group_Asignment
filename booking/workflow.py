@@ -34,18 +34,18 @@ def error_reply(code, message, status, booking_id=None):
 def valid_booking(data):
     if not isinstance(data, dict) or set(data) != set(FIELDS) | {"guest_name"}:
         return False
-    if not isinstance(data["guest_name"], str) or not 1 <= len(data["guest_name"].strip()) <= 100:
+    if not isinstance(data["guest_name"], str) or not data["guest_name"].strip():
         return False
     if not isinstance(data["room_id"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", data["room_id"]):
         return False
-    if type(data["guest_count"]) is not int or not 1 <= data["guest_count"] <= 8:
+    if type(data["guest_count"]) is not int or data["guest_count"] <= 0:
         return False
     try:
         for key in ("check_in", "check_out"):
             if not isinstance(data[key], str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", data[key]):
                 return False
         nights = (date.fromisoformat(data["check_out"]) - date.fromisoformat(data["check_in"])).days
-        return 1 <= nights <= 30
+        return nights > 0
     except ValueError:
         return False
 
@@ -177,12 +177,10 @@ class BookingWorkflow:
             db.close()
 
     def call(self, method, service, path, data=None):
-        if not self.config["INTERNAL_KEY"]:
-            return None, None
         try:
             with requests.request(
                 method, self.config[service + "_URL"].rstrip("/") + path,
-                json=data, headers={"X-Internal-Key": self.config["INTERNAL_KEY"]},
+                json=data,
                 timeout=self.config[service + "_TIMEOUT"], allow_redirects=False,
             ) as response:
                 try:

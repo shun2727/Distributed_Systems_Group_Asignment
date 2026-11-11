@@ -34,7 +34,7 @@ class BookingCancelTests(unittest.TestCase):
         self.assertEqual(self.server.reservations[original["booking_id"]]["status"], "released")
         release = [c for c in self.server.calls if c[1].endswith("/release")][0]
         self.assertIsNone(release[2])
-        self.assertEqual(release[3]["X-Internal-Key"], "test-key")
+        self.assertNotIn("X-Internal-Key", release[3])
         self.assertNotIn("X-Customer-Token", release[3])
 
     def test_repeat_cancel_is_success_without_another_release(self):

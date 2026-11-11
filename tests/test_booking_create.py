@@ -23,8 +23,6 @@ class BookingStub(BaseHTTPRequestHandler):
         data = json.loads(raw) if raw else None
         with self.server.lock:
             self.server.calls.append(("POST", self.path, data, dict(self.headers)))
-            if self.headers.get("X-Internal-Key") != "test-key":
-                return self.reply(401, {"error": {"code": "UNAUTHORIZED"}})
             if self.path == "/internal/notifications":
                 if self.server.notification_down:
                     return self.reply(503, {})
@@ -112,7 +110,7 @@ class BookingCreateTests(unittest.TestCase):
         self.server.lose_reply = self.server.bad_reply = False
         url = f"http://127.0.0.1:{self.server.server_port}"
         self.module.app.config.update(AVAILABILITY_URL=url, NOTIFICATION_URL=url,
-            INTERNAL_KEY="test-key", AVAILABILITY_TIMEOUT=.5, NOTIFICATION_TIMEOUT=.5)
+            AVAILABILITY_TIMEOUT=.5, NOTIFICATION_TIMEOUT=.5)
 
     def create(self, key=None, payload=None, client=None):
         return (client or self.client).post("/api/bookings", json=payload or self.payload,
@@ -129,7 +127,7 @@ class BookingCreateTests(unittest.TestCase):
         self.assertEqual(len(self.server.events), 1)
         self.assertEqual(set(booking), {"booking_id", "guest_name", "room_id", "check_in", "check_out", "guest_count", "status", "notification_status", "created_at", "updated_at"})
         for _, _, _, headers in self.server.calls:
-            self.assertEqual(headers["X-Internal-Key"], "test-key")
+            self.assertNotIn("X-Internal-Key", headers)
             self.assertNotIn("X-Customer-Token", headers)
 
     def test_identical_retry_returns_same_order(self):
@@ -201,12 +199,17 @@ class BookingCreateTests(unittest.TestCase):
         self.assertEqual(self.client.get(url).json, first.json)
         self.assertEqual(self.client.get("/api/bookings/missing").status_code, 404)
 
+    def test_validation_has_no_fixed_name_stay_or_guest_limit(self):
+        payload = dict(self.payload, guest_name="x" * 101,
+                       check_out="2026-12-20", guest_count=9)
+        self.assertTrue(self.module.valid_booking(payload))
+
     def test_invalid_create_never_calls_services(self):
         cases = [dict(self.payload, guest_name=""), dict(self.payload, guest_name="   "),
-            dict(self.payload, guest_name=None), dict(self.payload, guest_name="x" * 101),
+            dict(self.payload, guest_name=None), dict(self.payload, guest_name=123),
             dict(self.payload, guest_count=True), dict(self.payload, guest_count="2"),
-            dict(self.payload, guest_count=9), dict(self.payload, check_in="2026-02-30"),
-            dict(self.payload, check_out="2026-11-10"), dict(self.payload, check_out="2026-12-11"),
+            dict(self.payload, guest_count=0), dict(self.payload, check_in="2026-02-30"),
+            dict(self.payload, check_out="2026-11-10"), dict(self.payload, check_out="2026-11-09"),
             dict(self.payload, customer_id="someone-else"), dict(self.payload, total_price_cents=1)]
         for payload in cases:
             self.assertEqual(self.create(payload=payload).status_code, 400)

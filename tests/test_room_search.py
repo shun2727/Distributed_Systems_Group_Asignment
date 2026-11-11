@@ -59,20 +59,20 @@ class RoomSearchTests(unittest.TestCase):
         self.server.reply_body = json.dumps({"rooms": [ROOM]}).encode()
         self.module.app.config.update(
             AVAILABILITY_URL=f"http://127.0.0.1:{self.server.server_port}",
-            INTERNAL_KEY="test-internal-key", AVAILABILITY_TIMEOUT=0.5,
+            AVAILABILITY_TIMEOUT=0.5,
         )
 
     def search(self, **params):
         return self.client.get("/api/rooms", query_string=params or self.params, headers=self.headers)
 
-    def test_search_calls_real_http_stub_and_forwards_only_internal_key(self):
+    def test_search_calls_http_stub_without_internal_key(self):
         response = self.search()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"rooms": [ROOM]})
         path, headers = self.server.calls[0]
         self.assertEqual(urlparse(path).path, "/internal/rooms")
         self.assertEqual(parse_qs(urlparse(path).query), {k: [v] for k, v in self.params.items()})
-        self.assertEqual(headers["X-Internal-Key"], "test-internal-key")
+        self.assertNotIn("X-Internal-Key", headers)
         self.assertNotIn("X-Customer-Token", headers)
 
     def test_empty_room_list_is_success(self):
@@ -87,8 +87,8 @@ class RoomSearchTests(unittest.TestCase):
         cases = [dict(self.params, check_in="2026-02-30"),
                  dict(self.params, check_in="20261110"),
                  dict(self.params, check_out="2026-11-10"),
-                 dict(self.params, check_out="2026-12-11"),
-                 dict(self.params, guest_count="0"), dict(self.params, guest_count="9"),
+                 dict(self.params, check_out="2026-11-09"),
+                 dict(self.params, guest_count="0"), dict(self.params, guest_count="-1"),
                  dict(self.params, guest_count="2.0"), dict(self.params, guest_count="true"),
                  dict(self.params, extra="unexpected"), {"check_in": "2026-11-10"}]
         for params in cases:
@@ -99,15 +99,14 @@ class RoomSearchTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/rooms", query_string=duplicate, headers=self.headers).status_code, 400)
         self.assertEqual(self.server.calls, [])
 
-    def test_thirty_nights_are_allowed(self):
-        response = self.search(check_in="2026-11-10", check_out="2026-12-10", guest_count="2")
+    def test_stays_longer_than_thirty_nights_are_allowed(self):
+        response = self.search(check_in="2026-11-10", check_out="2026-12-20", guest_count="2")
         self.assertEqual(response.status_code, 200)
 
-    def test_missing_key_does_not_send_request(self):
-        self.module.app.config["INTERNAL_KEY"] = ""
-        response = self.search()
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(self.server.calls, [])
+    def test_no_key_configuration_is_needed(self):
+        self.module.app.config.pop("INTERNAL_KEY", None)
+        self.assertEqual(self.search().status_code, 200)
+        self.assertEqual(len(self.server.calls), 1)
 
     def test_unavailable_or_slow_service_returns_safe_error(self):
         self.server.delay = .2

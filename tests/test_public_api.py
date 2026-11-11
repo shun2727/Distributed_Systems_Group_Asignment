@@ -15,7 +15,6 @@ class PublicApiTests(DatabaseTests):
             self.assertIn(response.status_code, (404, 405))
 
     def test_create_without_login_accepts_guest_name(self):
-        self.module.app.config["INTERNAL_KEY"] = ""
         response = self.client.post("/api/bookings", headers={"Idempotency-Key": str(uuid.uuid4())},
             json={"guest_name": "  陈 Alex  ", "room_id": "R101", "check_in": "2026-11-15",
                   "check_out": "2026-11-17", "guest_count": 2})
