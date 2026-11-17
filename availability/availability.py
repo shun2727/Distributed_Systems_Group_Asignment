@@ -1,5 +1,6 @@
 """Room inventory and reservation service (http://localhost:5002)."""
 import json
+import hmac
 import os
 import re
 import sqlite3
@@ -11,7 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 DB = Path(os.environ.get("AVAILABILITY_DB", ROOT / "availability.db"))
-INTERNAL_KEY = os.environ.get("INTERNAL_KEY", "local-dev-internal-key")
+INTERNAL_KEY = os.environ.get("INTERNAL_KEY")
 ROOMS = [
     ("R101", "101", "single", 1, 8000), ("R102", "102", "single", 1, 8000),
     ("R201", "201", "double", 2, 12000), ("R202", "202", "double", 2, 12000),
@@ -65,7 +66,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path not in ("/internal/rooms",) and not re.fullmatch(r"/internal/reservations/[A-Za-z0-9_-]{1,64}", path):
             self.send_json(404, error("NOT_FOUND", "Route not found.")); return
-        if self.headers.get("X-Internal-Key") != INTERNAL_KEY:
+        supplied_key = self.headers.get("X-Internal-Key", "")
+        if not INTERNAL_KEY or not hmac.compare_digest(supplied_key.encode(), INTERNAL_KEY.encode()):
             self.send_json(401, error("UNAUTHORIZED", "Invalid internal key.")); return
         try:
             if path == "/internal/rooms":
@@ -79,7 +81,7 @@ class Handler(BaseHTTPRequestHandler):
                     rooms = c.execute("""SELECT r.* FROM rooms r WHERE r.capacity>=? AND (? IS NULL OR r.room_type=?) AND NOT EXISTS (SELECT 1 FROM occupied_nights n WHERE n.room_id=r.room_id AND n.stay_date>=? AND n.stay_date<?) ORDER BY r.room_id""", (int(guests), room_type, room_type, ci, co)).fetchall()
                 self.send_json(200, {"rooms":[dict(r) for r in rooms]}); return
             booking_id = path.rsplit("/", 1)[1]
-            with connect() as c: row = c.execute("SELECT * FROM reservations WHERE booking_id=?", (booking_id,)).fetchone()
+            with connect() as c: row = c.execute("SELECT reservations.*, rooms.room_type FROM reservations LEFT JOIN rooms ON rooms.room_id=reservations.room_id WHERE reservations.booking_id=?", (booking_id,)).fetchone()
             if not row: self.send_json(404, error("NOT_FOUND", "Reservation not found.")); return
             self.send_json(200, reservation_json(row)); return
         except sqlite3.Error:
@@ -88,7 +90,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path not in ("/internal/reservations",) and not re.fullmatch(r"/internal/reservations/[A-Za-z0-9_-]{1,64}/release", path):
             self.send_json(404, error("NOT_FOUND", "Route not found.")); return
-        if self.headers.get("X-Internal-Key") != INTERNAL_KEY:
+        supplied_key = self.headers.get("X-Internal-Key", "")
+        if not INTERNAL_KEY or not hmac.compare_digest(supplied_key.encode(), INTERNAL_KEY.encode()):
             self.send_json(401, error("UNAUTHORIZED", "Invalid internal key.")); return
         try:
             if path.endswith("/release"):
@@ -147,8 +150,12 @@ def valid_dates(ci, co):
     except ValueError: return False
 
 def reservation_json(row):
-    return {"reservation_id":row["reservation_id"],"booking_id":row["booking_id"],"room_id":row["room_id"],"check_in":row["check_in"],"check_out":row["check_out"],"guest_count":row["guest_count"],"status":row["status"],"total_price_cents":row["total_price_cents"],"currency":row["currency"]}
+    result = {"reservation_id":row["reservation_id"],"booking_id":row["booking_id"],"room_id":row["room_id"],"check_in":row["check_in"],"check_out":row["check_out"],"guest_count":row["guest_count"],"status":row["status"],"total_price_cents":row["total_price_cents"],"currency":row["currency"]}
+    if "room_type" in row.keys(): result["room_type"] = row["room_type"]
+    return result
 
 if __name__ == "__main__":
+    if not INTERNAL_KEY:
+        raise SystemExit("Set INTERNAL_KEY before starting the Availability service.")
     init_db(); port=int(os.environ.get("PORT", "5002")); print(f"Availability service: http://localhost:{port}")
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()

@@ -1,5 +1,6 @@
 """Idempotent booking confirmation recorder (http://localhost:5003)."""
 import json
+import hmac
 import os
 import re
 import sqlite3
@@ -10,7 +11,7 @@ from urllib.parse import urlparse
 
 ROOT=Path(__file__).resolve().parent
 DB=Path(os.environ.get("NOTIFICATION_DB",ROOT/"notification.db"))
-INTERNAL_KEY=os.environ.get("INTERNAL_KEY","local-dev-internal-key")
+INTERNAL_KEY=os.environ.get("INTERNAL_KEY")
 FIELDS={"event_id","event_type","booking_id","customer_id","room_id","check_in","check_out"}
 def connect():
     c=sqlite3.connect(DB,timeout=10,isolation_level=None); c.row_factory=sqlite3.Row; c.execute("PRAGMA busy_timeout=10000"); return c
@@ -35,7 +36,8 @@ class Handler(BaseHTTPRequestHandler):
         except sqlite3.Error: self.send_json(503,{"service":"notification","status":"error"})
     def do_POST(self):
         if urlparse(self.path).path!="/internal/notifications": self.send_json(404,err("NOT_FOUND","Route not found.")); return
-        if self.headers.get("X-Internal-Key")!=INTERNAL_KEY: self.send_json(401,err("UNAUTHORIZED","Invalid internal key.")); return
+        supplied_key=self.headers.get("X-Internal-Key","")
+        if not INTERNAL_KEY or not hmac.compare_digest(supplied_key.encode(),INTERNAL_KEY.encode()): self.send_json(401,err("UNAUTHORIZED","Invalid internal key.")); return
         try:
             if "application/json" not in self.headers.get("Content-Type","").lower(): self.send_json(415,err("UNSUPPORTED_MEDIA_TYPE","Content-Type must be application/json.")); return
             n=int(self.headers.get("Content-Length","0"))
@@ -61,4 +63,5 @@ def valid_date(s):
     try: return datetime.strptime(s,"%Y-%m-%d").date().isoformat()==s
     except ValueError: return False
 if __name__=="__main__":
+    if not INTERNAL_KEY: raise SystemExit("Set INTERNAL_KEY before starting the Notification service.")
     init_db(); port=int(os.environ.get("PORT","5003")); print(f"Notification service: http://localhost:{port}"); ThreadingHTTPServer(("0.0.0.0",port),Handler).serve_forever()

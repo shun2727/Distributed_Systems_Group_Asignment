@@ -19,7 +19,8 @@ ROOT=Path(__file__).resolve().parent
 DB=Path(os.environ.get("BOOKING_DB",ROOT/"booking.db"))
 AVAILABILITY_URL=os.environ.get("AVAILABILITY_URL","http://localhost:5002").rstrip("/")
 NOTIFICATION_URL=os.environ.get("NOTIFICATION_URL","http://localhost:5003").rstrip("/")
-INTERNAL_KEY=os.environ.get("INTERNAL_KEY","local-dev-internal-key")
+INTERNAL_KEY=os.environ.get("INTERNAL_KEY")
+CLIENT_ORIGINS=tuple(origin.strip() for origin in os.environ.get("CLIENT_ORIGINS","http://localhost:3000,http://127.0.0.1:3000").split(",") if origin.strip())
 TOKEN_TTL=timedelta(hours=2)
 BODY_LIMIT=16384
 
@@ -115,7 +116,7 @@ class Handler(BaseHTTPRequestHandler):
         body=json.dumps(payload,separators=(",",":")).encode(); self.send_response(status); self.send_header("Content-Type","application/json; charset=utf-8"); self.send_header("Content-Length",str(len(body))); self.send_header("Cache-Control","no-store"); self.cors(); self.end_headers(); self.wfile.write(body)
     def cors(self):
         origin=self.headers.get("Origin")
-        if origin in ("http://localhost:3000","http://127.0.0.1:3000"): self.send_header("Access-Control-Allow-Origin",origin); self.send_header("Vary","Origin")
+        if origin in CLIENT_ORIGINS: self.send_header("Access-Control-Allow-Origin",origin); self.send_header("Vary","Origin")
         self.send_header("Access-Control-Allow-Methods","GET, POST, OPTIONS"); self.send_header("Access-Control-Allow-Headers","Content-Type, X-Customer-Token, Idempotency-Key")
     def do_OPTIONS(self): self.send_response(204); self.cors(); self.end_headers()
     def read_json(self):
@@ -160,7 +161,10 @@ class Handler(BaseHTTPRequestHandler):
             if match:
                 with connect() as c: row=c.execute("SELECT * FROM bookings WHERE booking_id=? AND customer_id=?",(match.group(1),customer_id)).fetchone()
                 if not row: self.send_json(404,error("NOT_FOUND","Booking not found.")); return
-                row=recover_booking(row); self.send_json(200,as_booking(row)); return
+                row=recover_booking(row); result=as_booking(row)
+                status,details=service_request(AVAILABILITY_URL,"/internal/reservations/"+urllib.parse.quote(row["booking_id"]))
+                if status==200 and details and details.get("room_type"): result["room_type"]=details["room_type"]
+                self.send_json(200,result); return
             self.send_json(404,error("NOT_FOUND","Route not found."))
         except sqlite3.Error: self.send_json(503,error("SERVICE_UNAVAILABLE","Booking storage is temporarily unavailable."))
     def do_POST(self):
@@ -184,6 +188,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         customer_id=self.customer()
         if not customer_id: self.send_json(401,error("UNAUTHORIZED","Missing, invalid or expired customer token.")); return
+        if path=="/api/logout":
+            token=self.headers.get("X-Customer-Token","")
+            try:
+                with connect() as c: c.execute("DELETE FROM sessions WHERE token_hash=?",(token_digest(token),))
+                self.send_json(200,{"status":"signed_out"})
+            except sqlite3.Error: self.send_json(503,error("SERVICE_UNAVAILABLE","Could not end the session."))
+            return
         if path=="/api/bookings": self.create_booking(customer_id); return
         match=re.fullmatch(r"/api/bookings/([A-Za-z0-9_-]{1,64})/cancel",path)
         if match: self.cancel_booking(customer_id,match.group(1)); return
@@ -249,4 +260,5 @@ def notification_retry_loop():
         except sqlite3.Error: pass
 
 if __name__=="__main__":
+    if not INTERNAL_KEY: raise SystemExit("Set INTERNAL_KEY before starting the Booking service.")
     init_db(); threading.Thread(target=notification_retry_loop,daemon=True).start(); port=int(os.environ.get("PORT","5001")); print(f"Booking service: http://localhost:{port}"); ThreadingHTTPServer(("0.0.0.0",port),Handler).serve_forever()
