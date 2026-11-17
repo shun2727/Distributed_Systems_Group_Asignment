@@ -14,9 +14,9 @@ Use this guide so everyone sends and receives the same data. API means an addres
 | Notification - M4 | http://localhost:5003; Booking calls it. |
 
 
-### Complete API list: 15 operations
+### Complete API list: 12 operations
 
-| Provider | Method and path | Purpose |
+| Owner | Method and path | Purpose |
 | --- | --- | --- |
 | M2 | POST /api/login | Open or resume a phone-number session and receive a token |
 | M2 | POST /api/logout | Revoke the current phone-number session |
@@ -121,97 +121,97 @@ Send the customer token, request key and this JSON:
  "check_out": "2026-11-12", "guest_count": 2}
 ```
 
-201 means confirmed. 202 means still pending. Both return the Booking format below. An identical retry returns the original booking: 200 if finished successfully, 202 if pending; a rejected attempt repeats its saved error.
+**201** = new confirmed booking; **202** = pending. Both return the full Booking object:
 
 ```json
 {
-  "booking_id": "B001", "reservation_id": "RS001",
-  "customer_id": "C001", "room_id": "R101",
-  "check_in": "2026-11-10", "check_out": "2026-11-12",
-  "guest_count": 2, "status": "confirmed",
-  "total_price_cents": 24000, "currency": "MYR",
+  "booking_id": "B001",
+  "guest_name": "Alex Tan",
+  "room_id": "R101",
+  "check_in": "2026-11-15",
+  "check_out": "2026-11-17",
+  "guest_count": 2,
+  "status": "confirmed",
   "notification_status": "pending",
-  "created_at": "2026-11-03T12:00:00Z",
-  "updated_at": "2026-11-03T12:00:00Z"
+  "created_at": "2026-11-10T10:00:00Z",
+  "updated_at": "2026-11-10T10:00:00Z"
 }
 ```
 
+Booking generates an unpredictable booking ID. Keys are globally unique because there are no accounts. Save the key, original normalized input and booking together in one DB transaction. Compare field values, not JSON spacing/order.
 
-### List, view and cancel: no request body
+Same key + same input â†’ existing booking: 202 if pending/cancelling, 200 if confirmed/cancelled; rejected attempts repeat their saved error. Same key + changed input â†’ 409 IDEMPOTENCY_CONFLICT.
 
-GET /api/bookings: 200 with a bookings array of full Booking objects above; an empty list is {"bookings": []}. Return only this customer's orders, newest first by created_at, then booking_id descending. GET /api/bookings/{booking_id}: 200 with one full Booking object.
+### View and cancel
 
-POST /api/bookings/{booking_id}/cancel: return the full Booking object with status cancelled (200), or cancelling (202) while waiting for release. Do not delete the order. Another customer cannot view or cancel it: return 404.
+- `GET /api/bookings/{booking_id}` â†’ **200**, full Booking object, including rejected orders.
+- `POST /api/bookings/{booking_id}/cancel` â†’ **200**, full object with status cancelled; or **202**, status cancelling while release is unresolved.
+- Unknown booking â†’ 404. Repeat cancelled cancellation â†’ 200 unchanged; repeat cancelling â†’ 202; cancel pending/rejected â†’ 409 BOOKING_STATE_CONFLICT.
+- No booking-list endpoint. Client keeps the returned ID and also lets a guest enter an ID to retrieve a booking.
 
+### Client feedback
 
-## Booking to Availability: M2 calls M3
+| Result | Display |
+| --- | --- |
+| confirmed | Confirmation and booking ID |
+| 409 ROOM_UNAVAILABLE | Room unavailable |
+| pending | Booking is being processed |
+| cancelling | Cancellation is being processed |
+| cancelled | Cancellation confirmed |
+| rejected | Booking rejected |
+| 503 / network error | Unable to get result; preserve existing ID/request key |
 
+Poll pending/cancelling bookings with GET every 2 seconds, for up to 30 seconds. Stop when resolved; otherwise offer manual refresh. If the create response is lost, retry POST with the original key and input to retrieve the same order. Do not automatically create a new attempt.
 
-### Search: GET /internal/rooms
+## 3. Booking â†’ Availability
 
-Use X-Internal-Key. Send the same three URL parameters as the website search. Return the same 200 rooms JSON on page 2, including an empty rooms array when nothing matches.
+All calls require X-Internal-Key. Availability owns inventory.
 
+### Reserve
 
-### Reserve: POST /internal/reservations
-
-Use X-Internal-Key and JSON content type. Required request:
+`POST /internal/reservations`
 
 ```json
-{
-  "booking_id": "B001", "room_id": "R101",
-  "check_in": "2026-11-10", "check_out": "2026-11-12",
-  "guest_count": 2
-}
+{"booking_id": "B001", "room_id": "R101", "check_in": "2026-11-15", "check_out": "2026-11-17", "guest_count": 2}
 ```
 
-201 for a new reservation; 200 for the same request retried. Reply using this Reservation format:
+**201** for new reservation; **200** for identical retry:
 
 ```json
-{
-  "reservation_id": "RS001", "booking_id": "B001",
-  "room_id": "R101", "check_in": "2026-11-10",
-  "check_out": "2026-11-12", "guest_count": 2,
-  "status": "reserved", "total_price_cents": 24000,
-  "currency": "MYR"
-}
+{"booking_id": "B001", "room_id": "R101", "check_in": "2026-11-15", "check_out": "2026-11-17", "guest_count": 2, "status": "reserved"}
 ```
 
-Overlapping dates -> 409 ROOM_UNAVAILABLE. Same booking_id with changed fields -> 409 IDEMPOTENCY_CONFLICT. An ID that was released -> 409 RESERVATION_RELEASED. Unknown room -> 404; too many guests for the room -> 400.
+Overlap â†’ 409 ROOM_UNAVAILABLE. Changed input with same ID â†’ 409 IDEMPOTENCY_CONFLICT. Released ID â†’ 409 RESERVATION_RELEASED. Unknown room â†’ 404. Guests above room capacity â†’ 400.
 
+Insert reservation and all occupied nights in one transaction, using UNIQUE(room_id, stay_date). Any conflict rolls back the entire stay. Release nights and mark released together too.
 
-### Check: GET /internal/reservations/{booking_id}
+### Check after a lost reply
 
-Use X-Internal-Key; no body. 200 returns the full Reservation format above with status reserved or released. Unknown booking_id -> 404. M2 uses this after a lost or late response.
+`GET /internal/reservations/{booking_id}` â†’ **200**, full Reservation object above, status reserved or released. Unknown ID â†’ 404.
 
+Booking saves pending before calling reserve. Timeout means the outcome is unknown: return 202 pending. The background worker checks with the same booking ID: reserved â†’ confirm; 404 â†’ retry reserve using original input; released â†’ reject. Definite reservation rejections are saved as rejected; temporary failures remain pending.
 
-### Release: POST /internal/reservations/{booking_id}/release
+### Release
 
-Use X-Internal-Key; no body. Return 200, even when repeated:
+`POST /internal/reservations/{booking_id}/release` â†’ **200**, including repeated requests:
 
 ```json
 {"booking_id": "B001", "status": "released"}
 ```
 
-Keep the released record. If release arrives before reserve, save that ID as released anyway. A later reserve cannot reuse it. For this never-reserved ID, lookup returns the full Reservation shape with reservation_id, room_id, check_in, check_out, guest_count and total_price_cents null; booking_id, status and currency remain present. Otherwise keep the original details.
+Retain released IDs so delayed reserve calls cannot reuse them. If release arrives before reserve, save the ID as released anyway. GET then returns the full Reservation object with room_id, check_in, check_out and guest_count null. For previously reserved IDs, preserve their original details.
 
+Booking saves cancelling before release, then cancelled only after a matching release acknowledgement. Failure/timeout â†’ 202 cancelling and background retry using the same ID. Keep the order record.
 
-## Notifications and service checks
+## 4. Booking â†’ Notification
 
-
-### Send confirmation: M2 calls M4
-
-POST http://localhost:5003/internal/notifications. Use X-Internal-Key and JSON content type. All fields below are required; event_type must be booking.confirmed.
+`POST /internal/notifications`, with X-Internal-Key:
 
 ```json
-{
-  "event_id": "E001", "event_type": "booking.confirmed",
-  "booking_id": "B001", "customer_id": "C001",
-  "room_id": "R101", "check_in": "2026-11-10",
-  "check_out": "2026-11-12"
-}
+{"event_id": "E001", "event_type": "booking.confirmed", "booking_id": "B001", "guest_name": "Alex Tan", "room_id": "R101", "check_in": "2026-11-15", "check_out": "2026-11-17"}
 ```
 
-M4 saves the notification before replying. 201 first time; 200 for the same event retried:
+Save before replying: **201** first time; **200** for an identical retry:
 
 ```json
 {"event_id": "E001", "status": "recorded"}
@@ -257,26 +257,28 @@ Phone-number login identifies a demo customer but does not verify ownership of t
 
 | Item | Rule |
 | --- | --- |
-| Fields | snake_case. All fields in request examples are required. Reject unknown body fields and null request values. |
-| IDs | Strings, 1-64 letters/digits/hyphens/underscores. Do not depend on an ID format. |
-| Dates | Real YYYY-MM-DD dates; check_in before check_out; maximum 30 nights. Checkout day is not occupied. Past demo dates are allowed for repeatable tests. |
-| Guests | guest_count is an integer 1-8, not a string/boolean, and must fit room capacity. |
-| Prices | Integer MYR cents; server calculates total from rate x nights. No price in create requests. |
-| Timestamps | Server-generated UTC, ending Z. Booking dates are hotel-local calendar dates. |
-| Booking reply | All shown fields present. reservation_id/total_price_cents may be null while pending/rejected. Keep price/reservation after cancellation. |
-| States | Booking: pending, confirmed, rejected, cancelling, cancelled. Inventory: reserved/released. Notification: pending/sent. |
+| JSON | snake_case; example request fields required; reject unknown fields, nulls and malformed JSON |
+| guest_name | String, trimmed, 1â€“100 characters; allow non-ASCII names |
+| IDs | Strings, 1â€“64 letters/digits/underscores/hyphens; do not depend on example formats |
+| Dates | Real YYYY-MM-DD; check-in before check-out; at most 30 nights; past demo dates allowed |
+| Nights | Check-in included, check-out excluded: 15â€“17 November occupies nights 15 and 16 |
+| guest_count | Integer 1â€“8, not boolean/string; must fit room capacity |
+| Timestamps | Server-generated UTC ending Z |
+| Booking states | pending, confirmed, rejected, cancelling, cancelled |
+| Notification states | pending, sent; no event is sent before confirmation |
+| Recovery | Finite HTTP timeouts (e.g. 3 seconds), retry saved work (e.g. every 5 seconds) |
+| Storage | Parameterized SQL; no DB locks held during HTTP calls |
+| CORS | Booking allows configured Client origin (default http://localhost:3000), GET/POST/OPTIONS, Content-Type and Idempotency-Key; OPTIONS â†’ 204 |
 
-
-### Use the same error JSON everywhere except /health
+### Error JSON
 
 ```json
-{"error": {"code": "ROOM_UNAVAILABLE",
-           "message": "Room unavailable for these dates."}}
+{"error": {"code": "ROOM_UNAVAILABLE", "message": "Room unavailable for these dates."}, "booking_id": "B001"}
 ```
 
-If an authenticated customer's order already exists, also add booking_id at the top level. Clients read code, not the wording of message. For a rejected create, save the error/status and return them on retry. Never return private keys or stack traces.
+Add booking_id when an associated order exists; omit otherwise. Client reads code, not message wording. Never return keys or stack traces. Avoid real guest data in logs/screenshots. Knowing an ID is not authentication.
 
-| HTTP | Error code / meaning |
+| HTTP | Code |
 | --- | --- |
 | 400 / 401 | VALIDATION_ERROR (bad/missing fields or malformed JSON) / UNAUTHORIZED (wrong login, missing/invalid/expired token, or bad internal key) |
 | 404 / 405 | NOT_FOUND (missing or unowned item/route) / METHOD_NOT_ALLOWED |
