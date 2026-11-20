@@ -1,115 +1,193 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4ece4">
-  <title>AirnStay | Rooms for a softer stay</title>
-  <style>
-    :root{--ink:#172b25;--muted:#718078;--green:#245b47;--lime:#d8e7cb;--paper:#f6f5f1;--white:#fff;--line:#e6e9e2;--red:#a84237;--shadow:0 18px 50px #26392b12}
-    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}button,input,select{font:inherit}button{cursor:pointer}.shell{max-width:1160px;margin:auto;padding:0 30px}.topbar{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:11px;font-size:18px;font-weight:750;letter-spacing:-.04em}.brandmark{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:var(--green);color:white;font-size:17px}.brand small{display:block;color:var(--muted);font-weight:500;letter-spacing:0;font-size:10px}.nav{display:flex;align-items:center;gap:22px}.nav button{border:0;background:none;color:#52645a}.nav button.active{color:var(--green);font-weight:700}.account{display:flex;align-items:center;gap:10px}.account-name{font-size:13px;color:#68766e}.button{border:0;border-radius:11px;padding:11px 17px;background:var(--green);color:white;font-weight:700;transition:.18s}.button:hover{background:#194634;transform:translateY(-1px)}.button.secondary{background:#edf2e8;color:var(--green)}.button.ghost{background:transparent;color:var(--green);padding:8px 10px}.button:disabled{opacity:.55;cursor:wait;transform:none}.hero{position:relative;overflow:hidden;background:#e8eee2;border-radius:23px;margin:30px 0 24px;padding:42px 44px;min-height:216px}.hero:after{content:"";position:absolute;width:290px;height:290px;border-radius:50%;right:7%;top:-126px;background:#d6e2ce}.hero:before{content:"";position:absolute;width:185px;height:185px;border:1px solid #bdceb7;border-radius:50%;right:16%;top:20px;z-index:1}.hero-copy{position:relative;z-index:2;max-width:515px}.eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:10px;color:var(--green);font-weight:800}.hero h1{font-size:38px;line-height:1.08;letter-spacing:-.055em;margin:10px 0}.hero p{margin:0;color:#617166;max-width:430px}.hero-note{position:absolute;z-index:3;right:9%;bottom:28px;background:#ffffffd9;padding:12px 16px;border-radius:13px;font-size:12px;color:#3d5d4d;box-shadow:var(--shadow)}.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.78fr);gap:22px;padding-bottom:50px}.panel{background:var(--white);border:1px solid #eceee9;border-radius:17px;box-shadow:var(--shadow)}.search-panel{padding:22px 24px}.section-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.section-head h2{margin:0;font-size:19px;letter-spacing:-.035em}.sub{margin:4px 0 0;color:var(--muted);font-size:12px}.fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}.field label{display:block;font-size:11px;font-weight:700;color:#65746a;margin:0 0 6px}.field input,.field select,.auth-form input{width:100%;height:43px;padding:0 11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);outline:none}.field input:focus,.field select:focus,.auth-form input:focus{border-color:#6d987f;box-shadow:0 0 0 3px #245b4714}.search-row{display:flex;gap:11px;align-items:center;margin-top:15px}.search-row .button{min-width:138px}.status{font-size:12px;color:var(--muted)}.message{margin:14px 0 0;padding:11px 13px;border-radius:10px;font-size:13px}.message.error{background:#fff0ee;color:var(--red)}.message.ok{background:#edf6ed;color:#286143}.message.info{background:#f2f4ef;color:#506257}.message[hidden]{display:none}.results{margin-top:22px}.results-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px}.results-head h3{font-size:15px;margin:0}.room-list{display:grid;gap:10px}.room-card{border:1px solid var(--line);border-radius:13px;padding:14px;display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:13px}.room-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:#eff3e9;font-size:21px}.room-name{font-weight:750;font-size:14px}.room-meta{font-size:12px;color:var(--muted)}.room-card .button{padding:9px 13px;font-size:12px}.side{display:grid;align-content:start;gap:16px}.side-panel{padding:20px}.side-panel h2{font-size:16px;margin:0}.empty{color:var(--muted);font-size:13px;padding:20px 0 5px;text-align:center}.booking-list{display:grid;gap:10px;margin-top:15px}.booking-item{border:1px solid var(--line);border-radius:12px;padding:12px}.booking-top{display:flex;justify-content:space-between;gap:10px}.booking-id{font-size:10px;color:var(--muted);font-family:ui-monospace,monospace}.booking-room{font-weight:750;font-size:13px}.booking-dates{font-size:11px;color:var(--muted);margin-top:4px}.badge{white-space:nowrap;font-size:10px;font-weight:750;text-transform:capitalize;border-radius:99px;padding:4px 8px;background:#eef1eb;color:#5d6e62;height:max-content}.badge.confirmed{background:#e8f4e8;color:#2d7045}.badge.cancelled,.badge.rejected{background:#f3e9e7;color:#9b5045}.badge.pending,.badge.cancelling{background:#fbf2dc;color:#896e2d}.booking-actions{display:flex;gap:8px;margin-top:9px}.booking-actions button{font-size:11px;border:0;background:none;color:var(--green);padding:0;font-weight:700}.booking-actions button.cancel{color:#9b5045}.feature{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}.feature:first-of-type{margin-top:12px}.feature-icon{width:29px;height:29px;border-radius:9px;background:#f1f4ec;display:grid;place-items:center;font-size:14px}.feature strong{display:block;font-size:12px}.feature span{font-size:11px;color:var(--muted)}.overlay{position:fixed;inset:0;z-index:10;background:#14231f77;display:grid;place-items:center;padding:20px}.overlay[hidden]{display:none}.modal{width:min(420px,100%);background:white;border-radius:19px;padding:26px;box-shadow:0 24px 80px #1116}.modal-head{display:flex;justify-content:space-between;align-items:flex-start}.modal h2{font-size:22px;margin:0;letter-spacing:-.04em}.close{border:0;background:#f1f3ef;border-radius:9px;width:32px;height:32px;color:#56665b}.auth-tabs{display:flex;gap:8px;margin:20px 0}.auth-tabs button{flex:1;border:1px solid var(--line);background:white;border-radius:9px;padding:9px;color:var(--muted)}.auth-tabs button.active{background:#edf3e9;color:var(--green);border-color:#dce8d5;font-weight:700}.auth-form{display:grid;gap:12px}.auth-form label{font-size:12px;font-weight:700;color:#65746a}.auth-form input{display:block;margin-top:5px}.auth-form .button{width:100%;margin-top:3px}.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#203b2e;color:white;border-radius:11px;padding:12px 18px;font-size:13px;box-shadow:var(--shadow);transition:.2s;z-index:15}.toast.show{opacity:1;transform:translate(-50%,0)}.footer{border-top:1px solid var(--line);padding:20px 0 28px;color:var(--muted);font-size:11px;display:flex;justify-content:space-between}
-    [hidden]{display:none!important}.fields{grid-template-columns:1fr 1fr}.room-card{grid-template-columns:170px 1fr auto;overflow:hidden;padding:0;min-height:130px}.room-image{width:100%;height:100%;min-height:130px;object-fit:cover;background:#eff3e9}.room-copy{padding:15px 4px}.room-name{font-size:16px}.room-count{display:inline-block;margin-top:7px;padding:4px 9px;border-radius:99px;background:#edf3e9;color:var(--green);font-size:12px;font-weight:750}.room-price{font-size:12px;color:var(--muted);margin-top:4px}.room-card .button{margin:12px}.results-tools{display:flex;align-items:center;gap:10px}.filter-panel{display:flex;align-items:center;gap:12px;margin:0 0 13px;padding:12px;background:#f7f8f4;border-radius:11px}.filter-panel label{font-size:12px;font-weight:700;color:#65746a}.filter-panel select{min-width:180px;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:white;color:var(--ink)}.bookings-tab{padding-bottom:50px}.bookings-tab .side-panel{padding:24px}
-    @media(max-width:800px){.layout{grid-template-columns:1fr}.hero{padding:34px 28px}.hero:after{right:-10%}.hero-note{right:5%}.nav{gap:10px}.nav button{font-size:12px}.account-name{display:none}}
-    @media(max-width:560px){.shell{padding:0 16px}.topbar{height:65px}.brand{font-size:15px}.brandmark{width:31px;height:31px}.nav{display:flex;gap:4px}.nav button{font-size:11px;padding:6px}.hero{margin:20px 0 16px;padding:27px 23px;min-height:197px}.hero h1{font-size:32px}.hero:after{right:-175px}.hero:before,.hero-note{display:none}.layout{gap:14px}.search-panel,.side-panel{padding:18px}.fields{grid-template-columns:1fr 1fr}.search-row{align-items:stretch;flex-direction:column}.search-row .button{width:100%}.room-card{grid-template-columns:92px 1fr;gap:0}.room-image{grid-row:span 2;min-height:120px}.room-copy{padding:10px}.room-card .button{grid-column:2;margin:0 10px 10px;width:calc(100% - 20px)}.room-count{font-size:11px}.filter-panel{align-items:stretch;flex-direction:column;gap:6px}.filter-panel select{width:100%}.footer{display:block}.footer span{display:block;margin:4px 0}}
-    @media(max-width:560px){.shell{padding:0 16px}.topbar{height:65px}.brand{font-size:15px}.brandmark{width:31px;height:31px}.nav{display:flex;gap:4px}.nav button{font-size:11px;padding:6px}.hero{margin:20px 0 16px;padding:27px 23px;min-height:197px}.hero h1{font-size:32px}.hero:after{right:-175px}.hero:before,.hero-note{display:none}.layout{gap:14px}.search-panel,.side-panel{padding:18px}.fields{grid-template-columns:1fr 1fr}.search-row{align-items:stretch;flex-direction:column}.search-row .button{width:100%}.room-card{grid-template-columns:92px 1fr;gap:0}.room-image{grid-row:span 2;min-height:120px}.room-copy{padding:10px}.room-card .button{grid-column:2;margin:0 10px 10px;width:calc(100% - 20px)}.room-count{font-size:11px}.filter-panel{align-items:stretch;flex-direction:column;gap:6px}.filter-panel select{width:100%}.footer{display:block}.footer span{display:block;margin:4px 0}}
-    :root{--ink:#382820;--muted:#826e63;--green:#ad5140;--lime:#e6cec0;--paper:#f4ece4;--white:#fffaf5;--line:#e6d8ce;--red:#a84237;--shadow:0 18px 50px #50332616}
-    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
-    .topbar{border-bottom-color:#d9c5b8}.brand{font-family:Georgia,"Times New Roman",serif;font-size:21px;letter-spacing:-.03em;color:#3d2921}.brand small{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#9a6c58;letter-spacing:.12em;font-size:9px}.brandmark{position:relative;display:block;flex:0 0 48px;width:48px;height:48px;overflow:hidden;border-radius:0;background:transparent}.brandmark img{position:absolute;left:-35px;top:-40px;width:118px;max-width:none;height:auto}
-    .nav button{color:#80685c}.nav button.active{color:var(--green)}.button{background:var(--green);border-radius:4px;text-transform:uppercase;letter-spacing:.07em;font-size:11px}.button:hover{background:#873b30}.button.secondary{background:#ead8cc;color:#753d31}.button.ghost{color:#8e4b3d}
-    .hero{display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:30px;min-height:430px;margin:30px 0 26px;padding:50px 58px;background:#745342;border-radius:22px;color:#fff8f0}.hero:after{width:225px;height:225px;right:39%;top:-115px;background:#ae806a;opacity:.55}.hero:before{width:170px;height:170px;right:34%;top:auto;bottom:-72px;border-color:#d9b9a6;opacity:.7}.hero-copy{max-width:540px}.hero .eyebrow{color:#f0c1a8}.hero h1{max-width:560px;font:400 clamp(54px,7vw,88px)/.92 Georgia,"Times New Roman",serif;letter-spacing:-.065em;margin:18px 0}.hero p{max-width:360px;color:#f0ded2;font-size:15px}.hero-art{position:relative;z-index:2;min-height:322px}.hero-main-image{position:absolute;inset:0 8% 0 10%;width:82%;height:100%;object-fit:cover;border-radius:48% 48% 8px 8px;box-shadow:0 22px 48px #28181040}.hero-small-image{position:absolute;left:0;bottom:-18px;width:132px;height:132px;object-fit:cover;border:7px solid #745342;border-radius:50%}.hero-note{right:0;bottom:18px;background:#f4e9e0;color:#55392c;border-radius:2px;font-family:Georgia,serif;font-size:16px;padding:13px 17px;box-shadow:0 12px 30px #28181030}
-    .panel{background:var(--white);border-color:#e7d8ce;border-radius:5px;box-shadow:0 16px 38px #563d2c0c}.search-panel,.bookings-tab .side-panel{padding:28px 30px}.section-head h2,.side-panel h2{font:400 30px/1.1 Georgia,"Times New Roman",serif;letter-spacing:-.035em}.eyebrow{color:#a65341}.sub,.status{color:var(--muted)}.field input,.filter-panel select,.auth-form input{border-color:#dbc7ba;border-radius:3px;background:#fffdf9}.field input:focus,.filter-panel select:focus,.auth-form input:focus{border-color:#ad7661;box-shadow:0 0 0 3px #ad514018}.room-card{background:#fffaf5;border-color:#e2d0c3;border-radius:4px}.room-image{border-radius:0 0 70px 70px}.room-name{font:400 23px/1.1 Georgia,"Times New Roman",serif}.room-count{background:#edddd2;color:#874738;border-radius:2px}.room-price{color:#786156}.filter-panel{background:#f2e5db;border-radius:3px}.booking-item{border-color:#e2d0c3;border-radius:4px;background:#fffdf9}.badge{border-radius:2px}.feature-icon{background:#efdfd4;color:#8e4b3d;border-radius:2px}.footer{border-top-color:#d9c5b8;color:#80685c}.toast{background:#493126;color:#fff8f0;border-radius:3px}.modal{border-radius:5px;background:#fffaf5}.close{background:#edddd2;color:#70493b;border-radius:3px}.review-fields{display:grid;gap:0;margin:22px 0 10px;border-top:1px solid #e6d8ce}.review-row{display:grid;grid-template-columns:130px 1fr;gap:12px;padding:13px 0;border-bottom:1px solid #e6d8ce}.review-row strong{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8b7164}.review-row span{font-size:14px;color:#382820;overflow-wrap:anywhere}.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}.modal-actions .button{min-width:120px}.button.danger{background:#a84639}.button.danger:hover{background:#81372e}.modal-copy{color:#826e63;font-size:13px}.review-message{margin-top:12px}
-    @media(max-width:760px){.hero{grid-template-columns:1fr;gap:25px;padding:34px 28px;min-height:0}.hero h1{font-size:60px}.hero-art{min-height:270px}.hero-main-image{inset:0 10%;width:80%}.hero-small-image{width:100px;height:100px}.hero:after{right:8%;top:42%}.hero:before{right:0;bottom:-70px}}
-    @media(max-width:560px){.brandmark{flex-basis:38px;width:38px;height:38px}.brandmark img{left:-28px;top:-31px;width:94px}.hero{padding:30px 22px}.hero h1{font-size:52px}.hero-art{min-height:230px}.search-panel,.bookings-tab .side-panel{padding:20px 17px}.section-head h2,.side-panel h2{font-size:26px}.room-name{font-size:19px}}
-    .hero{background-color:#624434;background-image:linear-gradient(90deg,#382820e8 0%,#382820bd 43%,#38282045 100%),url('/assets/landing_background_2.png');background-position:center,center 52%;background-size:cover;color:#fff8f0}
-    .hero:after{background:#c9976f;opacity:.22}.hero:before{border-color:#f0d2bd;opacity:.45}
-    .search-panel{background-color:#fffaf5;background-image:linear-gradient(90deg,#fffaf5f5 0%,#fffaf5eb 62%,#fffaf5ad 100%),url('/assets/landing_background.png');background-position:center,right center;background-size:cover}
-    .bookings-tab .side-panel{background-color:#fffaf5;background-image:linear-gradient(180deg,#fffaf5 0%,#fffaf5f2 58%,#fffaf58c 100%),url('/assets/bookings.png');background-position:center,bottom right;background-repeat:no-repeat;background-size:cover,100% auto}
-  </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4ece4">
+    <title>AirnStay | Rooms for a softer stay</title>
+    <link rel="stylesheet" href="/index.css">
+    <script src="/index.js" defer></script>
 </head>
+
 <body>
-  <div class="shell">
-    <header class="topbar">
-      <div class="brand"><div class="brandmark"><img src="/assets/logo.png" alt=""></div><div>AirnStay<small>ROOMS FOR A SOFTER STAY</small></div></div>
-      <nav class="nav" aria-label="Main navigation"><button class="active" data-tab="searchTab">Find a room</button><button id="bookingsNav" data-tab="bookingsTab" hidden>My bookings</button></nav>
-      <div class="account"><span class="account-name" id="accountName">Guest mode</span><button class="button secondary" id="accountButton">Log in</button></div>
-    </header>
-    <section class="hero"><div class="hero-copy"><h1>Now available<br>for a little escape.</h1><p>Find a room that feels like yours. Choose your dates and we’ll take care of the details.</p></div><div class="hero-art" aria-hidden="true"><img class="hero-main-image" src="/assets/king-room.jpg" alt=""><img class="hero-small-image" src="/assets/double-bed.jpg" alt=""><div class="hero-note">A softer kind of stay</div></div></section>
-    <main class="layout" id="searchTab">
-      <section class="panel search-panel" id="search">
-        <div class="section-head"><div><h2>Find your stay</h2><p class="sub">Choose dates and we’ll show you what’s open.</p></div><span class="eyebrow">01 / 02</span></div>
-        <form id="searchForm">
-          <div class="fields">
-            <div class="field"><label for="checkIn">CHECK IN</label><input id="checkIn" type="date" required></div>
-            <div class="field"><label for="checkOut">CHECK OUT</label><input id="checkOut" type="date" required></div>
-          </div>
-          <div class="search-row"><button class="button" id="searchButton" type="submit">Search rooms <span aria-hidden="true">→</span></button><span class="status" id="searchHint">Room counts update for your dates.</span></div>
-        </form>
-        <div id="searchMessage" class="message" hidden></div>
-        <div class="results" id="results" hidden><div class="results-head"><h3>Available rooms</h3><div class="results-tools"><span class="sub" id="resultCount"></span><button class="button secondary" type="button" id="filterToggle">Filter</button></div></div><div class="filter-panel" id="filterPanel" hidden><label for="roomType">Room type</label><select id="roomType"><option value="">All room types</option><option value="single">Single room</option><option value="double">Double room</option><option value="king_suite">King room</option></select></div><div class="room-list" id="roomList"></div></div>
-      </section>
-      <aside class="side">
-        <section class="panel side-panel"><h2>A little peace of mind</h2><div class="feature"><div class="feature-icon">⌂</div><div><strong>Rooms made for rest</strong><span>Pick from six cosy, considered rooms.</span></div></div><div class="feature"><div class="feature-icon">✓</div><div><strong>Instant confirmation</strong><span>Your booking is confirmed as soon as it’s secured.</span></div></div><div class="feature"><div class="feature-icon">↗</div><div><strong>Easy to manage</strong><span>View or cancel a confirmed stay any time.</span></div></div></section>
-      </aside>
-    </main>
-    <main class="bookings-tab" id="bookingsTab" hidden><section class="panel side-panel"><div class="section-head"><div><h2>Your bookings</h2><p class="sub">Keep track of your upcoming stays.</p></div><button class="button ghost" id="refreshBookings" title="Refresh bookings">↻</button></div><div class="empty" id="bookingsEmpty">Loading your bookings…</div><div class="booking-list" id="bookingList"></div><div id="bookingMessage" class="message" hidden></div></section></main>
-    <footer class="footer"><span>AirnStay · A little place to feel at home</span><span>Bookings are subject to room availability</span></footer>
-  </div>
-  <div class="overlay" id="authOverlay" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle"><div class="modal-head"><div><div class="eyebrow">Welcome to AirnStay</div><h2 id="authTitle">Good to have you here.</h2><p class="sub" id="authSubtitle">Enter your phone number to open your session.</p></div><button class="close" id="closeAuth" aria-label="Close">×</button></div><form class="auth-form" id="authForm" style="margin-top:20px"><label>Phone number<input id="phoneNumber" type="tel" autocomplete="tel" inputmode="tel" minlength="8" maxlength="24" placeholder="+60123456789" required></label><button class="button" id="authSubmit">Continue</button><div id="authMessage" class="message" hidden></div></form></section></div>
-  <div class="overlay" id="bookingReviewOverlay" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="reviewTitle"><div class="modal-head"><div><div class="eyebrow" id="reviewEyebrow">Review your stay</div><h2 id="reviewTitle">Confirm your booking</h2><p class="sub" id="reviewSubtitle">Check these details before booking.</p></div><button class="close" id="closeReview" aria-label="Close">×</button></div><div class="review-fields"><div class="review-row"><strong>Room type</strong><span id="reviewRoom"></span></div><div class="review-row"><strong>Dates</strong><span id="reviewDates"></span></div><div class="review-row"><strong>Contact phone</strong><span id="reviewPhone"></span></div><div class="review-row" id="reviewBookingRow" hidden><strong>Booking ID</strong><span id="reviewBooking"></span></div><div class="review-row" id="reviewStatusRow" hidden><strong>Status</strong><span id="reviewStatus"></span></div></div><div id="reviewMessage" class="message review-message" hidden></div><div class="modal-actions"><button class="button secondary" id="reviewDismiss" type="button">Go back</button><button class="button" id="reviewConfirm" type="button">Confirm booking</button></div></section></div>
-  <div class="overlay" id="cancelOverlay" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="cancelTitle"><div class="modal-head"><div><div class="eyebrow">AirnStay bookings</div><h2 id="cancelTitle">Are you sure?</h2><p class="modal-copy" id="cancelCopy">Are you sure you want to cancel room 201? The room will be removed from your booking.</p></div><button class="close" id="closeCancel" aria-label="Close">×</button></div><div id="cancelMessage" class="message review-message" hidden></div><div class="modal-actions"><button class="button secondary" id="keepBooking" type="button">Keep booking</button><button class="button danger" id="confirmCancel" type="button">Cancel booking</button></div></section></div>
-  <div class="toast" id="toast" role="status"></div>
-  <script>
-    // Configure this URL if the Booking service runs somewhere other than localhost:5001.
-    const requestedBookingPort = Number(new URLSearchParams(window.location.search).get('booking_port'));
-    const bookingPort = Number.isInteger(requestedBookingPort) && requestedBookingPort > 0 && requestedBookingPort <= 65535 ? requestedBookingPort : 5001;
-    const API_BASE = window.HOTEL_BOOKING_API || `${window.location.protocol}//${window.location.hostname}:${bookingPort}`;
-    const state = {token:null,phoneNumber:null,rooms:[],bookings:[],selectedRoom:null,pending:null,cancelTarget:null,pollers:new Map()};
-    const $ = (id) => document.getElementById(id);
-    const dateInput = $('checkIn');
-    const localDate = new Date();
-    const dateString = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    dateInput.min = dateString(localDate); dateInput.value = dateString(localDate);
-    const tomorrow = new Date(localDate); tomorrow.setDate(tomorrow.getDate()+1); $('checkOut').min = dateString(tomorrow); $('checkOut').value = dateString(tomorrow);
-    dateInput.addEventListener('change',()=>{const d=new Date(`${dateInput.value}T12:00:00`);d.setDate(d.getDate()+1);$('checkOut').min=dateString(d);if($('checkOut').value<=dateInput.value)$('checkOut').value=dateString(d)});
-    function message(el,text,type='info'){el.textContent=text;el.className=`message ${type}`;el.hidden=false}
-    function clearMessage(el){el.hidden=true;el.textContent=''}
-    function errorText(data,fallback='Something went wrong. Please try again.'){return data?.error?.message||fallback}
-    async function api(path,{method='GET',body,auth=true,key}={}){
-      const headers={}; if(body!==undefined)headers['Content-Type']='application/json'; if(auth&&state.token)headers['X-Customer-Token']=state.token; if(key)headers['Idempotency-Key']=key;
-      let response; try{response=await fetch(`${API_BASE}${path}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body)})}catch(e){throw new Error('The booking service could not be reached. Please try again shortly.')}
-      let data={}; try{data=await response.json()}catch(e){}
-      if(response.status===401&&auth){state.token=null;state.phoneNumber=null;renderAccount();openAuth();throw new Error('Your session expired. Please log in again.')}
-      if(!response.ok)return {ok:false,status:response.status,data}; return {ok:true,status:response.status,data};
-    }
-    function switchTab(tab){if(tab==='bookings'&&!state.token){openAuth();return}$('searchTab').hidden=tab!=='search';$('bookingsTab').hidden=tab!=='bookings';document.querySelectorAll('[data-tab]').forEach(button=>button.classList.toggle('active',button.dataset.tab===`${tab}Tab`));if(tab==='bookings')loadBookings()}
-    function renderAccount(){if(state.token){$('accountName').textContent=`Hi, ${state.phoneNumber}`;$('accountButton').textContent='Sign out';$('bookingsNav').hidden=false;$('bookingsEmpty').textContent='Loading your bookings…';loadBookings()}else{$('accountName').textContent='Guest mode';$('accountButton').textContent='Log in';$('bookingsNav').hidden=true;switchTab('search');$('bookingsEmpty').textContent='Log in to see your bookings.';$('bookingList').replaceChildren()}}
-    function openAuth(){ $('authOverlay').hidden=false;clearMessage($('authMessage'));$('phoneNumber').focus() }
-    function showToast(text){const t=$('toast');t.textContent=text;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200)}
-    function escapeText(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-    function roomTypeName(type){return type==='king_suite'?'King room':type==='double'?'Double room':type==='single'?'Single room':'Room'}
-    function roomLabel(room){return `${roomTypeName(room.room_type)}${room.room_number?` · Room ${room.room_number}`:''}`}
-    function renderRooms(rooms){state.rooms=rooms;$('results').hidden=false;$('roomList').replaceChildren();const type=$('roomType').value;const visible=type?rooms.filter(room=>room.room_type===type):rooms;$('resultCount').textContent=`${visible.length} ${visible.length===1?'room':'rooms'} left`;
-      const groups=new Map();for(const room of visible){if(!groups.has(room.room_type))groups.set(room.room_type,[]);groups.get(room.room_type).push(room)}
-      if(!groups.size){$('roomList').innerHTML='<div class="empty">No rooms are available for those dates. Try another date range or room type.</div>';return}
-      const photos={single:'/assets/super-single.png',double:'/assets/double-bed.jpg',king_suite:'/assets/king-room.jpg'};
-      for(const [roomType,group] of groups){const room=group[0];const card=document.createElement('article');card.className='room-card';const image=document.createElement('img');image.className='room-image';image.src=photos[roomType]||photos.single;image.alt=roomTypeName(roomType);image.loading='lazy';const copy=document.createElement('div');copy.className='room-copy';copy.innerHTML=`<div class="room-name">${escapeText(roomTypeName(roomType))}</div><div class="room-meta">Up to ${escapeText(room.capacity)} ${room.capacity===1?'guest':'guests'} · ${roomType==='king_suite'?'King bed':roomType==='double'?'Double bed':'Single bed'}</div><span class="room-count">${group.length} ${group.length===1?'room':'rooms'} left</span><div class="room-price">${room.currency||'MYR'} ${(Number(room.price_per_night_cents||0)/100).toFixed(2)} / night</div>`;const button=document.createElement('button');button.type='button';button.className='button';button.textContent='Book this room';button.addEventListener('click',()=>chooseRoom(room,button));card.append(image,copy,button);$('roomList').append(card)}}
-    $('searchForm').addEventListener('submit',async e=>{e.preventDefault();clearMessage($('searchMessage'));$('results').hidden=true;const ci=$('checkIn').value,co=$('checkOut').value;if(!ci||!co||co<=ci){message($('searchMessage'),'Please choose a check-out date after check-in.','error');return}if(!state.token){openAuth();message($('authMessage'),'Log in to search for available rooms.','info');return}const button=$('searchButton');button.disabled=true;button.textContent='Searching…';try{const qs=new URLSearchParams({check_in:ci,check_out:co,guest_count:'1'});const res=await api(`/api/rooms?${qs}`);if(!res.ok){message($('searchMessage'),errorText(res.data,'We couldn’t search rooms right now.'),'error');return}renderRooms(Array.isArray(res.data.rooms)?res.data.rooms:[])}catch(err){message($('searchMessage'),err.message,'error')}finally{button.disabled=false;button.innerHTML='Search rooms <span aria-hidden="true">→</span>'}});
-    $('filterToggle').onclick=()=>{$('filterPanel').hidden=!$('filterPanel').hidden};$('roomType').onchange=()=>renderRooms(state.rooms);
-    function showBookingReview({roomType,checkIn,checkOut,phone,bookingId,status,readOnly=false}){$('reviewEyebrow').textContent=readOnly?'Booking details':'Review your stay';$('reviewTitle').textContent=readOnly?'Your booking':'Confirm your booking';$('reviewSubtitle').textContent=readOnly?'These booking details are read-only.':'Check these details before confirming.';$('reviewRoom').textContent=roomTypeName(roomType);$('reviewDates').textContent=`${checkIn} → ${checkOut}`;$('reviewPhone').textContent=phone||'Not provided';$('reviewBookingRow').hidden=!bookingId;$('reviewBooking').textContent=bookingId||'';$('reviewStatusRow').hidden=!status;$('reviewStatus').textContent=status||'';$('reviewDismiss').textContent=readOnly?'Close':'Go back';$('reviewConfirm').hidden=readOnly;$('reviewConfirm').disabled=false;$('reviewConfirm').textContent='Confirm booking';clearMessage($('reviewMessage'));$('bookingReviewOverlay').hidden=false}
-    function closeBookingReview(){$('bookingReviewOverlay').hidden=true}
-    function chooseRoom(room){if(!state.token){openAuth();return}state.pending={key:uuid(),body:{room_id:room.room_id,check_in:$('checkIn').value,check_out:$('checkOut').value,guest_count:1},room};showBookingReview({roomType:room.room_type,checkIn:$('checkIn').value,checkOut:$('checkOut').value,phone:state.phoneNumber})}
-    function uuid(){return crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`}
-    async function submitBooking(){if(!state.pending)return;const button=$('reviewConfirm');button.disabled=true;button.textContent='Booking…';clearMessage($('reviewMessage'));try{const res=await api('/api/bookings',{method:'POST',body:state.pending.body,key:state.pending.key});if(!res.ok){message($('reviewMessage'),errorText(res.data,'We couldn’t complete that booking.'),'error');if(res.status<500){state.pending=null;button.hidden=true;$('reviewDismiss').textContent='Close'}return}const booking=res.data;if(booking.status==='rejected'){message($('reviewMessage'),'That room is no longer available. Close this window and search again.','error');state.pending=null;button.hidden=true;$('reviewDismiss').textContent='Close';return}const roomId=state.pending.room.room_id;state.pending=null;closeBookingReview();if(booking.booking_id)sessionStorage.setItem('airnstay:lastBookingId',booking.booking_id);state.rooms=state.rooms.filter(r=>r.room_id!==roomId);renderRooms(state.rooms);showToast(booking.status==='confirmed'?'Your stay is confirmed!':'Your booking is being confirmed…');loadBookings();if(booking.status==='pending'&&booking.booking_id)watchBooking(booking.booking_id)}catch(err){message($('reviewMessage'),`${err.message} You can retry this same booking safely.`,'error')}finally{button.disabled=false;button.textContent='Confirm booking'}}
-    async function loadBookings(){if(!state.token)return;try{const res=await api('/api/bookings');if(!res.ok){$('bookingsEmpty').textContent=errorText(res.data,'Could not load bookings.');return}renderBookings(res.data.bookings||[])}catch(err){$('bookingsEmpty').textContent=err.message}}
-    function renderBookings(bookings){state.bookings=bookings;const list=$('bookingList');list.replaceChildren();$('bookingsEmpty').hidden=bookings.length>0;if(!bookings.length){$('bookingsEmpty').hidden=false;$('bookingsEmpty').textContent='No bookings yet. Search rooms to plan a stay.';return}for(const b of bookings){const item=document.createElement('article');item.className='booking-item';const label=state.rooms.find(r=>r.room_id===b.room_id);item.innerHTML=`<div class="booking-top"><div><div class="booking-room">${escapeText(label?roomLabel(label):`Room ${b.room_id}`)}</div><div class="booking-id">${escapeText(b.booking_id)}</div></div><span class="badge ${escapeText(b.status)}">${escapeText(b.status)}</span></div><div class="booking-dates">${escapeText(b.check_in)} → ${escapeText(b.check_out)}</div><div class="booking-actions"><button data-view>View details</button>${b.status==='confirmed'?'<button class="cancel" data-cancel>Cancel booking</button>':''}</div>`;item.querySelector('[data-view]').onclick=()=>viewBooking(b.booking_id);const cancel=item.querySelector('[data-cancel]');if(cancel)cancel.onclick=()=>cancelBooking(b.booking_id);list.append(item)}}
-    async function viewBooking(id){try{const res=await api(`/api/bookings/${encodeURIComponent(id)}`);if(!res.ok){showToast(errorText(res.data,'Could not load this booking.'));return}const b=res.data;const cached=state.rooms.find(room=>room.room_id===b.room_id);showBookingReview({roomType:b.room_type||cached?.room_type,checkIn:b.check_in,checkOut:b.check_out,phone:state.phoneNumber,bookingId:b.booking_id,status:b.status,readOnly:true});if(['pending','cancelling'].includes(b.status))watchBooking(id)}catch(err){showToast(err.message)}}
-    function cancelBooking(id){const booking=state.bookings.find(item=>item.booking_id===id);if(!booking)return;state.cancelTarget=booking;const roomNumber=booking.room_number||booking.room_id?.replace(/^R/,'')||'your room';$('cancelCopy').textContent=`Are you sure you want to cancel room ${roomNumber}? Reference number: ${booking.booking_id}. Stay dates: ${booking.check_in} - ${booking.check_out}. The room will be removed from your booking.`;clearMessage($('cancelMessage'));$('cancelOverlay').hidden=false}
-    async function confirmCancellation(){if(!state.cancelTarget)return;const button=$('confirmCancel');button.disabled=true;button.textContent='Cancelling…';clearMessage($('cancelMessage'));try{const res=await api(`/api/bookings/${encodeURIComponent(state.cancelTarget.booking_id)}/cancel`,{method:'POST'});if(!res.ok){message($('cancelMessage'),errorText(res.data,'Could not cancel this booking.'),'error');return}const id=state.cancelTarget.booking_id;$('cancelOverlay').hidden=true;state.cancelTarget=null;if(res.data.status==='cancelling')watchBooking(id);showToast(res.data.status==='cancelled'?'Booking cancelled.':'Cancellation is processing…');loadBookings()}catch(err){message($('cancelMessage'),err.message,'error')}finally{button.disabled=false;button.textContent='Cancel booking'}}
-    function watchBooking(id){if(state.pollers.has(id))return;let attempts=0;const timer=setInterval(async()=>{attempts++;try{const res=await api(`/api/bookings/${encodeURIComponent(id)}`);if(res.ok&&!['pending','cancelling'].includes(res.data.status)){clearInterval(timer);state.pollers.delete(id);loadBookings();showToast(res.data.status==='cancelled'?'Booking cancelled.':res.data.status==='confirmed'?'Your stay is confirmed!':'Booking status updated.');return}}catch(e){}if(attempts>=15){clearInterval(timer);state.pollers.delete(id);loadBookings();showToast('Status check paused. Refresh your bookings to check again.')}},2000);state.pollers.set(id,timer)}
-    $('authForm').addEventListener('submit',async e=>{e.preventDefault();clearMessage($('authMessage'));const button=$('authSubmit');button.disabled=true;button.textContent='Opening session…';const phoneNumber=$('phoneNumber').value.trim();try{const res=await api('/api/login',{method:'POST',auth:false,body:{phone_number:phoneNumber}});if(!res.ok){message($('authMessage'),errorText(res.data,'Could not open your session.'),'error');return}state.token=res.data.token;state.phoneNumber=phoneNumber;$('authOverlay').hidden=true;renderAccount();showToast('Welcome back. Your session is open.')}catch(err){message($('authMessage'),err.message,'error')}finally{button.disabled=false;button.textContent='Continue'}});
-    async function signOut(){const token=state.token;let revoked=false;try{const response=await fetch(`${API_BASE}/api/logout`,{method:'POST',headers:{'X-Customer-Token':token}});revoked=response.ok}catch(e){}state.token=null;state.phoneNumber=null;renderAccount();showToast(revoked?'You’ve been signed out.':'Signed out on this device; the server session could not be revoked.')}
-    $('accountButton').onclick=()=>{if(state.token)signOut();else openAuth()};$('closeAuth').onclick=()=>$('authOverlay').hidden=true;$('refreshBookings').onclick=loadBookings;document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>switchTab(button.dataset.tab==='searchTab'?'search':'bookings'));$('closeReview').onclick=closeBookingReview;$('reviewDismiss').onclick=closeBookingReview;$('reviewConfirm').onclick=submitBooking;$('closeCancel').onclick=()=>$('cancelOverlay').hidden=true;$('keepBooking').onclick=()=>$('cancelOverlay').hidden=true;$('confirmCancel').onclick=confirmCancellation;
-    // Token intentionally remains in memory only; entering the same phone number reopens its booking identity.
-  </script>
+    <div class="shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brandmark"><img src="/assets/logo.png" alt=""></div>
+                <div>AirnStay<small>ROOMS FOR A SOFTER STAY</small></div>
+            </div>
+            <nav class="nav" aria-label="Main navigation"><button class="active" data-tab="searchTab">Find a room</button><button id="bookingsNav" data-tab="bookingsTab" hidden>My bookings</button><button id="notificationsNav" data-tab="notificationsTab" hidden>Notifications</button><button id="adminNav" data-tab="adminTab" hidden>Admin desk</button><button id="adminHistoryNav" data-tab="adminHistoryTab" hidden>Booking history</button></nav>
+            <div class="account"><span class="account-name" id="accountName">Guest mode</span><button class="notification-button" id="accountNotifications" aria-label="Open notifications" title="Notifications" hidden>🔔<span id="notificationCount" class="notification-count" hidden></span></button><button class="button secondary" id="accountButton">Log in</button></div>
+        </header>
+        <section class="hero">
+            <div class="hero-copy">
+                <h1>Now available<br>for a little escape.</h1>
+                <p>Find a room that feels like yours. Choose your dates and we’ll take care of the details.</p>
+            </div>
+            <div class="hero-art" aria-hidden="true"><img class="hero-main-image" src="/assets/king-room.jpg" alt=""><img class="hero-small-image" src="/assets/double-bed.jpg" alt="">
+                <div class="hero-note">A softer kind of stay</div>
+            </div>
+        </section>
+        <main class="layout" id="searchTab">
+            <section class="panel search-panel" id="search">
+                <div class="section-head">
+                    <div>
+                        <h2>Find your stay</h2>
+                        <p class="sub">Choose dates and we’ll show you what’s open.</p>
+                    </div><span class="eyebrow">01 / 02</span>
+                </div>
+                <form id="searchForm">
+                    <div class="fields">
+                        <div class="field"><label for="checkIn">CHECK IN</label><input id="checkIn" type="date" required></div>
+                        <div class="field"><label for="checkOut">CHECK OUT</label><input id="checkOut" type="date" required></div>
+                    </div>
+                    <div class="search-row"><button class="button" id="searchButton" type="submit">Search rooms <span aria-hidden="true">→</span></button><span class="status" id="searchHint">Room counts update for your dates.</span></div>
+                </form>
+                <div id="searchMessage" class="message" hidden></div>
+                <div class="results" id="results" hidden>
+                    <div class="results-head">
+                        <h3>Available rooms</h3>
+                        <div class="results-tools"><span class="sub" id="resultCount"></span><button class="button secondary" type="button" id="filterToggle">Filter</button></div>
+                    </div>
+                    <div class="filter-panel" id="filterPanel" hidden><label for="roomType">Room type</label><select id="roomType">
+                            <option value="">All room types</option>
+                            <option value="single">Single room</option>
+                            <option value="double">Double room</option>
+                            <option value="king_suite">King room</option>
+                        </select></div>
+                    <div class="room-list" id="roomList"></div>
+                </div>
+            </section>
+            <aside class="side">
+                <section class="panel side-panel">
+                    <h2>A little peace of mind</h2>
+                    <div class="feature">
+                        <div class="feature-icon">⌂</div>
+                        <div><strong>Rooms made for rest</strong><span>Pick from six cosy, considered rooms.</span></div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">✓</div>
+                        <div><strong>Instant confirmation</strong><span>Your booking is confirmed as soon as it’s secured.</span></div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">↗</div>
+                        <div><strong>Easy to manage</strong><span>View or cancel a confirmed stay any time.</span></div>
+                    </div>
+                </section>
+            </aside>
+        </main>
+        <main class="bookings-tab" id="bookingsTab" hidden>
+            <section class="panel side-panel">
+                <div class="section-head">
+                    <div>
+                        <h2>Your bookings</h2>
+                        <p class="sub">Keep track of your upcoming stays.</p>
+                    </div><button class="button ghost" id="refreshBookings" title="Refresh bookings">↻</button>
+                </div>
+                <div class="empty" id="bookingsEmpty">Loading your bookings…</div>
+                <div class="booking-list" id="bookingList"></div>
+                <div id="bookingMessage" class="message" hidden></div>
+            </section>
+        </main>
+        <main class="bookings-tab" id="notificationsTab" hidden>
+            <section class="panel side-panel">
+                <div class="section-head"><div><h2>Your notifications</h2><p class="sub">Booking updates and their timestamps.</p></div><button type="button" class="button secondary" id="clearNotifications">Clear notifications</button></div>
+                <div id="notificationList" class="booking-list"></div>
+            </section>
+        </main>
+        <main class="bookings-tab" id="adminTab" hidden>
+            <section class="panel side-panel"><div class="section-head"><div><h2>Booking desk</h2><p class="sub">View all stays and manage arrivals for a day.</p></div><div><label>Day <input id="adminDay" type="date"></label> <button class="button" id="newAdminBooking">New booking</button></div></div><div class="booking-list" id="adminBookingList"></div><div id="adminMessage" class="message" hidden></div></section>
+        </main>
+        <main class="bookings-tab" id="adminHistoryTab" hidden>
+            <section class="panel side-panel">
+                <div class="section-head"><div><h2>Booking history</h2><p class="sub">Review current and past booking records.</p></div></div>
+                <form id="historyFilterForm" class="history-filters">
+                    <label>From date<input id="historyFrom" type="date"></label>
+                    <label>To date<input id="historyTo" type="date"></label>
+                    <label>Room<select id="historyRoom"><option value="">All rooms</option><option value="R101">Room 101</option><option value="R102">Room 102</option><option value="R201">Room 201</option><option value="R202">Room 202</option><option value="R301">Room 301</option><option value="R302">Room 302</option></select></label>
+                    <div class="history-filter-actions"><button class="button" type="submit">Apply filters</button><button class="button secondary" type="button" id="clearHistoryFilters">Clear filters</button></div>
+                </form>
+                <div id="historyMessage" class="message" hidden></div>
+                <div class="booking-list" id="historyBookingList"></div>
+            </section>
+        </main>
+        <footer class="footer"><span>AirnStay · A little place to feel at home</span><span>Bookings are subject to room availability</span></footer>
+    </div>
+    <div class="overlay" id="authOverlay" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+            <div class="modal-head">
+                <div>
+                    <div class="eyebrow">Welcome to AirnStay</div>
+                    <h2 id="authTitle">Good to have you here.</h2>
+                    <p class="sub" id="authSubtitle">Enter your phone number to open your session.</p>
+                </div><button class="close" id="closeAuth" aria-label="Close">×</button>
+            </div>
+            <form class="auth-form" id="authForm" style="margin-top:20px"><label id="authIdentityLabel">Phone number<input id="authIdentity" type="text" autocomplete="tel" inputmode="text" minlength="8" maxlength="24" placeholder="+60123456789" required></label><label id="adminPasswordLabel" hidden>Admin password<input id="adminPassword" type="password" autocomplete="current-password"></label><button class="button" id="authSubmit">Continue</button>
+                <div id="authMessage" class="message" hidden></div>
+            </form>
+        </section>
+    </div>
+    <div class="overlay" id="bookingReviewOverlay" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+            <div class="modal-head">
+                <div>
+                    <div class="eyebrow" id="reviewEyebrow">Review your stay</div>
+                    <h2 id="reviewTitle">Confirm your booking</h2>
+                    <p class="sub" id="reviewSubtitle">Check these details before booking.</p>
+                </div><button class="close" id="closeReview" aria-label="Close">×</button>
+            </div>
+            <div class="review-fields">
+                <label id="guestNameRow">Guest name<input id="guestName" maxlength="100" required placeholder="Name for this booking"></label>
+                <div class="review-row"><strong>Room type</strong><span id="reviewRoom"></span></div>
+                <div class="review-row"><strong>Dates</strong><span id="reviewDates"></span></div>
+                <div class="review-row"><strong>Contact phone</strong><span id="reviewPhone"></span></div>
+                <div class="review-row" id="reviewBookingRow" hidden><strong>Booking ID</strong><span id="reviewBooking"></span></div>
+                <div class="review-row" id="reviewStatusRow" hidden><strong>Status</strong><span id="reviewStatus"></span></div>
+            </div>
+            <div id="reviewMessage" class="message review-message" hidden></div>
+            <div class="modal-actions"><button class="button secondary" id="reviewDismiss" type="button">Go back</button><button class="button" id="reviewConfirm" type="button">Confirm booking</button></div>
+        </section>
+    </div>
+    <div class="overlay" id="cancelOverlay" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="cancelTitle">
+            <div class="modal-head">
+                <div>
+                    <div class="eyebrow">AirnStay bookings</div>
+                    <h2 id="cancelTitle">Are you sure?</h2>
+                    <div class="modal-copy cancel-details" id="cancelCopy"></div>
+                </div><button class="close" id="closeCancel" aria-label="Close">×</button>
+            </div>
+            <div id="cancelMessage" class="message review-message" hidden></div>
+            <div class="modal-actions"><button class="button secondary" id="keepBooking" type="button">Keep booking</button><button class="button danger" id="confirmCancel" type="button">Cancel booking</button></div>
+        </section>
+    </div>
+    <div class="overlay" id="adminBookingOverlay" hidden>
+        <section class="modal admin-booking-modal" role="dialog" aria-modal="true" aria-labelledby="adminBookingTitle">
+            <div class="modal-head"><div><div class="eyebrow">Admin booking</div><h2 id="adminBookingTitle">Create a guest booking</h2><p class="sub">Enter the guest details, choose dates, then select an available room.</p></div><button class="close" id="closeAdminBooking" aria-label="Close">×</button></div>
+            <form id="adminBookingForm" class="auth-form admin-booking-form">
+                <label>Guest phone number<input id="adminGuestPhone" type="tel" autocomplete="tel" placeholder="+60123456789" required></label>
+                <label>Guest name<input id="adminGuestName" maxlength="100" required></label>
+                <label>Guests<input id="adminGuestCount" type="number" min="1" max="8" value="1" required></label>
+                <div class="fields"><div class="field"><label for="adminCheckIn">CHECK IN</label><input id="adminCheckIn" type="date" required></div><div class="field"><label for="adminCheckOut">CHECK OUT</label><input id="adminCheckOut" type="date" required></div></div>
+                <button class="button" id="adminSearchRooms" type="submit">Search available rooms</button>
+            </form>
+            <div id="adminRoomMessage" class="message" hidden></div><div id="adminRoomChoices" class="room-list admin-room-choices"></div>
+            <div class="modal-actions"><button class="button secondary" id="adminBookingCancel" type="button">Cancel</button><button class="button" id="adminBookingConfirm" type="button" disabled>Confirm booking</button></div>
+        </section>
+    </div>
+    <div class="overlay" id="adminDateOverlay" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="adminDateTitle">
+            <div class="modal-head"><div><div class="eyebrow">Update booking</div><h2 id="adminDateTitle">Change stay dates</h2><p class="sub">The room must be available for the new dates.</p></div><button class="close" id="closeAdminDate" aria-label="Close">×</button></div>
+            <form id="adminDateForm" class="auth-form admin-date-form">
+                <label>Check in<input id="modifyCheckIn" type="date" required></label>
+                <label>Check out<input id="modifyCheckOut" type="date" required></label>
+                <div id="adminDateMessage" class="message" hidden></div>
+                <div class="modal-actions"><button class="button secondary" id="cancelAdminDate" type="button">Keep current dates</button><button class="button" id="saveAdminDate" type="submit">Save dates</button></div>
+            </form>
+        </section>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
 </body>
+
 </html>

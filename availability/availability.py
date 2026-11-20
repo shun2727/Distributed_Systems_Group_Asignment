@@ -88,12 +88,26 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(503, error("SERVICE_UNAVAILABLE", "Availability storage is temporarily unavailable."))
     def do_POST(self):
         path = urlparse(self.path).path
-        if path not in ("/internal/reservations",) and not re.fullmatch(r"/internal/reservations/[A-Za-z0-9_-]{1,64}/release", path):
+        if path not in ("/internal/reservations",) and not re.fullmatch(r"/internal/reservations/[A-Za-z0-9_-]{1,64}/(release|modify)", path):
             self.send_json(404, error("NOT_FOUND", "Route not found.")); return
         supplied_key = self.headers.get("X-Internal-Key", "")
         if not INTERNAL_KEY or not hmac.compare_digest(supplied_key.encode(), INTERNAL_KEY.encode()):
             self.send_json(401, error("UNAUTHORIZED", "Invalid internal key.")); return
         try:
+            if path.endswith("/modify"):
+                booking_id = path.split("/")[-2]; body = self.read_json()
+                ci,co=body.get("check_in"),body.get("check_out")
+                if not valid_dates(ci,co): self.send_json(400,error("VALIDATION_ERROR","Invalid dates.")); return
+                with connect() as c:
+                    c.execute("BEGIN IMMEDIATE"); row=c.execute("SELECT * FROM reservations WHERE booking_id=?",(booking_id,)).fetchone()
+                    if not row or row["status"]!="reserved": c.rollback(); self.send_json(404,error("NOT_FOUND","Active reservation not found.")); return
+                    nights=(date.fromisoformat(co)-date.fromisoformat(ci)).days
+                    room=c.execute("SELECT price_per_night_cents FROM rooms WHERE room_id=?",(row["room_id"],)).fetchone()
+                    c.execute("DELETE FROM occupied_nights WHERE booking_id=?",(booking_id,))
+                    try: c.executemany("INSERT INTO occupied_nights(room_id,stay_date,booking_id) VALUES(?,?,?)",((row["room_id"],date.fromordinal(date.fromisoformat(ci).toordinal()+i).isoformat(),booking_id) for i in range(nights)))
+                    except sqlite3.IntegrityError: c.rollback(); self.send_json(409,error("ROOM_UNAVAILABLE","Room unavailable for those dates.")); return
+                    c.execute("UPDATE reservations SET check_in=?,check_out=?,total_price_cents=? WHERE booking_id=?",(ci,co,room["price_per_night_cents"]*nights,booking_id)); updated=c.execute("SELECT * FROM reservations WHERE booking_id=?",(booking_id,)).fetchone(); c.commit()
+                self.send_json(200,reservation_json(updated)); return
             if path.endswith("/release"):
                 booking_id = path.split("/")[-2]
                 with connect() as c:
