@@ -117,8 +117,9 @@ def recover_booking(row):
             update_booking(row["booking_id"],status="confirmed",reservation_id=res.get("reservation_id"),total_price_cents=res.get("total_price_cents"),currency=res.get("currency","MYR"),notification_status="pending")
         elif res.get("status")=="released": update_booking(row["booking_id"],status="rejected",error_json=json.dumps(error("RESERVATION_RELEASED","This reservation was already released.")))
     elif status==404:
-        body=json.loads(row["request_json"])
-        code,result=service_request(AVAILABILITY_URL,"/internal/reservations","POST",dict(body,booking_id=row["booking_id"]))
+        # Send only the five fields Availability accepts; request_json also holds guest_name.
+        reserve={"booking_id":row["booking_id"],"room_id":row["room_id"],"check_in":row["check_in"],"check_out":row["check_out"],"guest_count":row["guest_count"]}
+        code,result=service_request(AVAILABILITY_URL,"/internal/reservations","POST",reserve)
         if code in (200,201) and result:
             update_booking(row["booking_id"],status="confirmed",reservation_id=result.get("reservation_id"),total_price_cents=result.get("total_price_cents"),currency=result.get("currency","MYR"),notification_status="pending")
         elif code==409:
@@ -295,6 +296,7 @@ class Handler(BaseHTTPRequestHandler):
             if not row: self.send_json(404,error("NOT_FOUND","Booking not found.")); return
             if row["status"] in ("cancelled","rejected"): self.send_json(200,as_booking(row)); return
             if row["status"]=="pending": self.send_json(409,error("BOOKING_STATE_CONFLICT","A pending booking cannot be cancelled yet.")); return
+            if row["status"] not in ("confirmed","cancelling"): self.send_json(409,error("BOOKING_STATE_CONFLICT","A booking cannot be cancelled after check-in.")); return
             if row["status"]=="confirmed": update_booking(booking_id,status="cancelling")
             code,data=service_request(AVAILABILITY_URL,"/internal/reservations/"+urllib.parse.quote(booking_id)+"/release","POST")
             if code==200: update_booking(booking_id,status="cancelled")
@@ -357,6 +359,7 @@ class Handler(BaseHTTPRequestHandler):
         if path=="/admin/bookings":
             body,problem=self.read_json()
             if problem: self.body_error(problem); return
+            if not isinstance(body,dict): self.send_json(400,error("VALIDATION_ERROR","Provide phone, room, guest name, guest count and valid dates.")); return
             phone=normalize_phone(body.get("phone_number")); rid=body.get("room_id"); ci=body.get("check_in"); co=body.get("check_out"); guests=body.get("guest_count"); name=body.get("guest_name")
             if not phone or not valid_id(rid) or not valid_dates(ci,co) or type(guests) is not int or not 1<=guests<=8 or not isinstance(name,str) or not name.strip(): self.send_json(400,error("VALIDATION_ERROR","Provide phone, room, guest name, guest count and valid dates.")); return
             with connect() as c:
@@ -365,13 +368,23 @@ class Handler(BaseHTTPRequestHandler):
                 bid="B"+uuid.uuid4().hex[:16]; current=stamp()
                 c.execute("INSERT INTO bookings(booking_id,customer_id,request_key,request_json,room_id,check_in,check_out,guest_count,status,currency,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",(bid,customer,"ADMIN"+uuid.uuid4().hex,"{}",rid,ci,co,guests,"pending","MYR",current,current)); c.execute("INSERT INTO booking_names VALUES(?,?)",(bid,name.strip()))
             code,data=service_request(AVAILABILITY_URL,"/internal/reservations","POST",{"booking_id":bid,"room_id":rid,"check_in":ci,"check_out":co,"guest_count":guests})
-            if code not in (200,201): update_booking(bid,status="rejected"); self.send_json(409,data or error("ROOM_UNAVAILABLE","Room unavailable.")); return
-            update_booking(bid,status="confirmed",reservation_id=data.get("reservation_id"),total_price_cents=data.get("total_price_cents"),currency=data.get("currency","MYR")); notify(customer,bid,"Booking created by admin"); self.send_json(201,as_booking(load_booking(bid))); return
+            if code in (200,201) and data:
+                # Queue the confirmation event like a customer booking, so Notification records it too.
+                update_booking(bid,status="confirmed",reservation_id=data.get("reservation_id"),total_price_cents=data.get("total_price_cents"),currency=data.get("currency","MYR"),notification_status="pending")
+                deliver_notification(load_booking(bid)); notify(customer,bid,"Booking created by admin"); self.send_json(201,as_booking(load_booking(bid))); return
+            if code in (400,404,409):
+                payload=data or error("ROOM_UNAVAILABLE","Room unavailable.")
+                update_booking(bid,status="rejected",error_json=json.dumps(payload)); self.send_json(code,payload); return
+            # Timeout or Availability down: the room may already be reserved, so keep it pending for the retry loop.
+            self.send_json(202,as_booking(load_booking(bid))); return
         match=re.fullmatch(r"/admin/bookings/([A-Za-z0-9_-]{1,64})/(cancel|checkin|checkout|modify)",path)
         if not match: self.send_json(404,error("NOT_FOUND","Route not found.")); return
         bid,action=match.groups()
         with connect() as c: row=c.execute("SELECT * FROM bookings WHERE booking_id=?",(bid,)).fetchone()
         if not row: self.send_json(404,error("NOT_FOUND","Booking not found.")); return
+        allowed={"cancel":("confirmed","cancelling"),"checkin":("confirmed",),"checkout":("checked_in",),"modify":("confirmed","checked_in")}
+        if row["status"] not in allowed[action]:
+            self.send_json(409,error("BOOKING_STATE_CONFLICT",f"Cannot {action} a booking that is {row['status']}.")); return
         if action=="cancel":
             code,_=service_request(AVAILABILITY_URL,"/internal/reservations/"+urllib.parse.quote(bid)+"/release","POST")
             if code!=200: self.send_json(503,error("SERVICE_UNAVAILABLE","Could not release room inventory.")); return
