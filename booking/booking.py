@@ -303,6 +303,18 @@ class Handler(BaseHTTPRequestHandler):
         except sqlite3.Error: self.send_json(503,error("SERVICE_UNAVAILABLE","Booking storage is temporarily unavailable."))
 
     def admin_get(self,path,parsed):
+        if path=="/admin/stats":
+            day=urllib.parse.parse_qs(parsed.query).get("date",[date.today().isoformat()])[0]
+            try:
+                if date.fromisoformat(day).isoformat()!=day: raise ValueError()
+            except (ValueError,TypeError): self.send_json(400,error("VALIDATION_ERROR","Invalid dashboard date.")); return
+            with connect() as c:
+                arrivals=c.execute("SELECT COUNT(*) FROM bookings WHERE check_in=? AND status IN ('confirmed','checked_in')",(day,)).fetchone()[0]
+                departures=c.execute("SELECT COUNT(*) FROM bookings WHERE check_out=? AND status IN ('confirmed','checked_in')",(day,)).fetchone()[0]
+                in_house=c.execute("SELECT COUNT(*) FROM bookings WHERE check_in<=? AND check_out>? AND status IN ('confirmed','checked_in')",(day,day)).fetchone()[0]
+                cancelled=c.execute("SELECT COUNT(*) FROM bookings WHERE status='cancelled' AND substr(updated_at,1,10)=?",(day,)).fetchone()[0]
+                revenue=c.execute("SELECT COALESCE(SUM(total_price_cents),0) FROM bookings WHERE check_in=? AND status IN ('confirmed','checked_in','checked_out')",(day,)).fetchone()[0]
+            self.send_json(200,{"date":day,"arrivals":arrivals,"departures":departures,"in_house":in_house,"cancelled":cancelled,"arrival_revenue_cents":revenue}); return
         if path=="/admin/rooms":
             q=urllib.parse.parse_qs(parsed.query); ci=q.get("check_in",[None])[0]; co=q.get("check_out",[None])[0]; guests=q.get("guest_count",["1"])[0]
             if not valid_dates(ci,co) or not guests.isdigit() or not 1<=int(guests)<=8:

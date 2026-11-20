@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f4ece4">
     <title>AirnStay | Rooms for a softer stay</title>
-    <link rel="stylesheet" href="/index.css">
-    <script src="/index.js" defer></script>
+    <link rel="stylesheet" href="/index.css?v=3">
+    <script src="/index.js?v=3" defer></script>
 </head>
 
 <body>
@@ -20,12 +20,12 @@
             <nav class="nav" aria-label="Main navigation"><button class="active" data-tab="searchTab">Find a room</button><button id="bookingsNav" data-tab="bookingsTab" hidden>My bookings</button><button id="notificationsNav" data-tab="notificationsTab" hidden>Notifications</button><button id="adminNav" data-tab="adminTab" hidden>Admin desk</button><button id="adminHistoryNav" data-tab="adminHistoryTab" hidden>Booking history</button></nav>
             <div class="account"><span class="account-name" id="accountName">Guest mode</span><button class="notification-button" id="accountNotifications" aria-label="Open notifications" title="Notifications" hidden>🔔<span id="notificationCount" class="notification-count" hidden></span></button><button class="button secondary" id="accountButton">Log in</button></div>
         </header>
-        <section class="hero">
+        <section class="hero" id="heroBanner">
             <div class="hero-copy">
                 <h1>Now available<br>for a little escape.</h1>
                 <p>Find a room that feels like yours. Choose your dates and we’ll take care of the details.</p>
             </div>
-            <div class="hero-art" aria-hidden="true"><img class="hero-main-image" src="/assets/king-room.jpg" alt=""><img class="hero-small-image" src="/assets/double-bed.jpg" alt="">
+            <div class="hero-art" aria-hidden="true"><img class="hero-main-image" src="/assets/lobby.jpg" alt=""><img class="hero-small-image" src="/assets/dining%20area.jpg" alt="">
                 <div class="hero-note">A softer kind of stay</div>
             </div>
         </section>
@@ -35,7 +35,7 @@
                     <div>
                         <h2>Find your stay</h2>
                         <p class="sub">Choose dates and we’ll show you what’s open.</p>
-                    </div><span class="eyebrow">01 / 02</span>
+                    </div>
                 </div>
                 <form id="searchForm">
                     <div class="fields">
@@ -52,28 +52,19 @@
                     </div>
                     <div class="filter-panel" id="filterPanel" hidden><label for="roomType">Room type</label><select id="roomType">
                             <option value="">All room types</option>
-                            <option value="single">Single room</option>
-                            <option value="double">Double room</option>
-                            <option value="king_suite">King room</option>
+                            <option value="single">Superior double room</option>
+                            <option value="double">Superior twin room</option>
+                            <option value="king_suite">Deluxe twin room</option>
                         </select></div>
                     <div class="room-list" id="roomList"></div>
                 </div>
             </section>
-            <aside class="side">
+            <aside class="side" id="peaceAside">
                 <section class="panel side-panel">
-                    <h2>A little peace of mind</h2>
-                    <div class="feature">
-                        <div class="feature-icon">⌂</div>
-                        <div><strong>Rooms made for rest</strong><span>Pick from six cosy, considered rooms.</span></div>
-                    </div>
-                    <div class="feature">
-                        <div class="feature-icon">✓</div>
-                        <div><strong>Instant confirmation</strong><span>Your booking is confirmed as soon as it’s secured.</span></div>
-                    </div>
-                    <div class="feature">
-                        <div class="feature-icon">↗</div>
-                        <div><strong>Easy to manage</strong><span>View or cancel a confirmed stay any time.</span></div>
-                    </div>
+                    <h2>Hotel amenities</h2>
+                    <p class="sub">Available around the hotel during your stay.</p>
+                    <div class="amenity-list"><span>Wi-Fi</span><span>Restaurant</span><span>On-site parking</span><span>Air conditioning</span><span>Room service</span><span>Breakfast buffet*</span></div>
+                    <p class="amenity-note">*Breakfast is available at an additional charge. In-room tea and coffee facilities are provided; rooms do not include a full kitchen.</p>
                 </section>
             </aside>
         </main>
@@ -97,7 +88,8 @@
             </section>
         </main>
         <main class="bookings-tab" id="adminTab" hidden>
-            <section class="panel side-panel"><div class="section-head"><div><h2>Booking desk</h2><p class="sub">View all stays and manage arrivals for a day.</p></div><div><label>Day <input id="adminDay" type="date"></label> <button class="button" id="newAdminBooking">New booking</button></div></div><div class="booking-list" id="adminBookingList"></div><div id="adminMessage" class="message" hidden></div></section>
+            <section class="panel side-panel admin-dashboard"><div class="section-head"><div><h2>Daily overview</h2><p class="sub">Arrivals, departures, in-house stays and revenue.</p></div><label class="admin-day-label" for="adminDay">Date <input id="adminDay" type="date"></label></div><div class="stat-grid"><article class="stat-card"><span>Arrivals</span><strong id="statArrivals">—</strong></article><article class="stat-card"><span>Departures</span><strong id="statDepartures">—</strong></article><article class="stat-card"><span>In house</span><strong id="statInHouse">—</strong></article><article class="stat-card"><span>Cancelled</span><strong id="statCancelled">—</strong></article><article class="stat-card"><span>Arrival revenue</span><strong id="statRevenue">—</strong></article></div><div id="adminStatsMessage" class="message" hidden></div></section>
+            <section class="panel side-panel"><div class="section-head"><div><h2>Booking desk</h2><p class="sub">Manage stays for the selected date.</p></div><button class="button" id="newAdminBooking">New booking</button></div><div class="booking-list" id="adminBookingList"></div><div id="adminMessage" class="message" hidden></div></section>
         </main>
         <main class="bookings-tab" id="adminHistoryTab" hidden>
             <section class="panel side-panel">
@@ -112,7 +104,7 @@
                 <div class="booking-list" id="historyBookingList"></div>
             </section>
         </main>
-        <footer class="footer"><span>AirnStay · A little place to feel at home</span><span>Bookings are subject to room availability</span></footer>
+        <footer class="footer" id="pageFooter"><span>AirnStay · A little place to feel at home</span><span>Bookings are subject to room availability</span></footer>
     </div>
     <div class="overlay" id="authOverlay" hidden>
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
@@ -129,7 +121,7 @@
         </section>
     </div>
     <div class="overlay" id="bookingReviewOverlay" hidden>
-        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+        <section class="modal room-detail-modal" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
             <div class="modal-head">
                 <div>
                     <div class="eyebrow" id="reviewEyebrow">Review your stay</div>
@@ -142,9 +134,20 @@
                 <div class="review-row"><strong>Room type</strong><span id="reviewRoom"></span></div>
                 <div class="review-row"><strong>Dates</strong><span id="reviewDates"></span></div>
                 <div class="review-row"><strong>Contact phone</strong><span id="reviewPhone"></span></div>
+                <div class="review-row" id="reviewPriceRow" hidden><strong>Estimated total</strong><span id="reviewPrice"></span></div>
                 <div class="review-row" id="reviewBookingRow" hidden><strong>Booking ID</strong><span id="reviewBooking"></span></div>
                 <div class="review-row" id="reviewStatusRow" hidden><strong>Status</strong><span id="reviewStatus"></span></div>
             </div>
+            <section id="reviewRoomDetails" class="review-room-details">
+                <div class="room-gallery-column">
+                    <div class="room-gallery-controls"><button type="button" id="reviewImagePrev" aria-label="Previous room photo">‹</button><span id="roomPhotoCaption" aria-live="polite">Bedroom · 1 of 2</span><button type="button" id="reviewImageNext" aria-label="Next room photo">›</button></div>
+                    <div id="reviewRoomGallery" class="room-gallery" tabindex="0" aria-label="Room and bathroom photos">
+                        <figure class="room-gallery-slide"><img id="reviewRoomImage" alt="Bedroom photograph"><figcaption>Bedroom</figcaption></figure>
+                        <figure class="room-gallery-slide"><img id="reviewBathroomImage" alt="Bathroom photograph"><figcaption>Bathroom</figcaption></figure>
+                    </div>
+                </div>
+                <div class="review-room-copy"><h3 id="reviewRoomHeading"></h3><p id="reviewRoomSummary"></p><div id="reviewAmenityList" class="review-amenities"></div><div class="stay-times"><span>Check-in from <strong>3:00 PM</strong></span><span>Check-out by <strong>12:00 PM</strong></span></div><p class="room-assumption-note">Room layout is based on the supplied photos and hotel reference; guest limits follow AirnStay room settings.</p></div>
+            </section>
             <div id="reviewMessage" class="message review-message" hidden></div>
             <div class="modal-actions"><button class="button secondary" id="reviewDismiss" type="button">Go back</button><button class="button" id="reviewConfirm" type="button">Confirm booking</button></div>
         </section>

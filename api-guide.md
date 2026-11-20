@@ -1,6 +1,6 @@
-# Hotel Booking: Shared API Guide v1.2
+# AirnStay: Shared API Guide
 
-17 November 2026. Defines phone-number sessions and the local booking, inventory and notification APIs.
+Updated 20 November 2026 to match the current implementation in `booking/booking.py`, `availability/availability.py`, and `notification/notification.py`.
 
 
 ## Who calls which API?
@@ -14,23 +14,39 @@ Use this guide so everyone sends and receives the same data. API means an addres
 | Notification - M4 | http://localhost:5003; Booking calls it. |
 
 
-### Complete API list: 12 operations
+### Implemented API routes
 
 | Owner | Method and path | Purpose |
 | --- | --- | --- |
-| M2 | POST /api/login | Open or resume a phone-number session and receive a token |
-| M2 | POST /api/logout | Revoke the current phone-number session |
-| M2 | GET /api/rooms | Find rooms |
-| M2 | POST /api/bookings | Create booking |
-| M2 | GET /api/bookings | List own bookings |
-| M2 | GET /api/bookings/{booking_id} | View one booking |
-| M2 | POST /api/bookings/{booking_id}/cancel | Cancel booking |
+| M2 | POST /api/login | Open or resume a phone-number session |
+| M2 | POST /api/logout | Revoke the current customer session |
+| M2 | POST /api/admin/identify | Check an admin access sequence |
+| M2 | POST /api/admin/login | Open an admin session using sequence and password |
+| M2 | POST /api/admin/logout | Revoke the current admin session |
+| M2 | GET /api/rooms | Find rooms for the customer |
+| M2 | POST /api/bookings | Create a booking for the customer |
+| M2 | GET /api/bookings | List the customer's bookings |
+| M2 | GET /api/bookings/{booking_id} | View one owned booking |
+| M2 | POST /api/bookings/{booking_id}/cancel | Cancel an owned booking |
+| M2 | GET /api/notifications | List notifications and unread count |
+| M2 | POST /api/notifications/read | Mark all customer notifications read |
+| M2 | POST /api/notifications/clear | Delete all customer notifications |
+| M2 | GET /admin/rooms | Find rooms for an admin-created booking |
+| M2 | GET /admin/day | List active bookings overlapping a date |
+| M2 | GET /admin/stats | Get daily dashboard counts and arrival revenue |
+| M2 | GET /admin/bookings | List booking history with optional filters |
+| M2 | POST /admin/bookings | Create a booking for a guest |
+| M2 | POST /admin/bookings/{booking_id}/cancel | Cancel a booking as admin |
+| M2 | POST /admin/bookings/{booking_id}/checkin | Check in a guest |
+| M2 | POST /admin/bookings/{booking_id}/checkout | Check out a guest |
+| M2 | POST /admin/bookings/{booking_id}/modify | Change the stay dates |
 | M3 | GET /internal/rooms | Find rooms |
 | M3 | POST /internal/reservations | Reserve room nights |
 | M3 | GET /internal/reservations/{booking_id} | Check reservation |
 | M3 | POST /internal/reservations/{booking_id}/release | Release room nights |
-| M4 | POST /internal/notifications | Save confirmation |
-| M2 / M3 / M4 | GET /health on each service (3 operations) | Check service runs |
+| M3 | POST /internal/reservations/{booking_id}/modify | Change reserved dates |
+| M4 | POST /internal/notifications | Save a booking-confirmation event |
+| M2 / M3 / M4 | GET /health on each service | Check service runs |
 
 ### Booking request flow
 
@@ -40,7 +56,7 @@ Keep these as separate processes and APIs. `booking/booking.py` owns the client-
 | --- | --- | --- | --- |
 | 1. Search | Client -> Booking | GET /api/rooms | Room list from Booking |
 | 2. Check availability | Booking -> Availability | GET /internal/rooms | Available room list |
-| 3. Submit booking | Client -> Booking | POST /api/bookings | Final order result after reservation and notification attempt |
+| 3. Submit booking | Client -> Booking | POST /api/bookings | Booking result; a guest name is stored with it |
 | 4. Reserve room | Booking -> Availability | POST /internal/reservations | Reserved, conflict, or unknown room |
 | 5. Record confirmation | Booking -> Notification | POST /internal/notifications | Acknowledgement; failed delivery remains pending and is retried |
 
@@ -48,9 +64,12 @@ Steps 1-2 run when the guest searches. Steps 3-5 run when the guest books. Booki
 
 | Later action | From -> To | Request | Reply |
 | --- | --- | --- | --- |
+| List bookings | Client -> Booking | GET /api/bookings | This customer's bookings |
 | View or check progress | Client -> Booking | GET /api/bookings/{booking_id} | Current order |
 | Cancel | Client -> Booking | POST /api/bookings/{booking_id}/cancel | Cancelled or cancelling |
 | Release room | Booking -> Availability | POST /internal/reservations/{booking_id}/release | Released acknowledgement |
+
+The admin console uses a separate admin token. It supports room search, creating guest bookings, listing bookings for a selected date, daily statistics, date and room filtered history, cancellation, check-in, check-out, and date changes. Booking writes user-facing notifications for these actions directly to its notification table. The Notification service is a separate internal event recorder for confirmed booking events; its records are not the user's notification-tab data.
 
 The services use these default addresses:
 
@@ -64,7 +83,7 @@ The services use these default addresses:
 
 ### Headers: information sent with the request
 
-Website -> Booking: X-Customer-Token carries the token returned by login. All /api routes except login require it, including room search. POST /api/logout deletes the current token hash from the sessions table so that token can no longer be reused. Booking -> other services: X-Internal-Key is a server-only secret. `run.sh` creates a random key for each launch unless INTERNAL_KEY is supplied. Creating a booking also needs Idempotency-Key: a new UUID for each new booking attempt; reuse it when retrying that attempt. Send Content-Type: application/json with JSON bodies. Login, health and OPTIONS preflight need no token.
+Customer website -> Booking: X-Customer-Token carries the token returned by `/api/login`. Protected `/api/*` routes require it. Admin website -> Booking: X-Admin-Token carries the token returned by `/api/admin/login`; protected `/admin/*` routes require it. `/api/admin/identify` and `/api/admin/login` are public authentication routes. Logout deletes the current token hash. Booking -> other services: X-Internal-Key is a server-only secret. `run.sh` creates a random key for each launch unless INTERNAL_KEY is supplied. Creating a customer booking also needs Idempotency-Key: a new UUID per new attempt; reuse it when retrying that attempt. Send Content-Type: application/json with JSON bodies. Health and OPTIONS preflight need no token.
 
 Keep private tokens/keys out of GitHub and URLs. Booking identifies customer_id from the token, not from user-supplied JSON. Customer IDs are generated by Booking; do not assume a particular ID format or let the browser choose an identity.
 
@@ -99,13 +118,13 @@ M1: keep the login token in browser memory and attach it as X-Customer-Token on 
 
 ### Find rooms: GET /api/rooms
 
-Use X-Customer-Token. No JSON body. Required URL parameters: check_in=2026-11-10, check_out=2026-11-12 and guest_count=2. Booking asks Availability and returns 200 with this room-list format:
+Use X-Customer-Token. No JSON body. Required URL parameters: check_in, check_out and guest_count (1-8). Booking asks Availability and returns 200 with this room-list format:
 
 ```json
 {"rooms": [{
   "room_id": "R101", "room_number": "101",
-  "room_type": "standard", "capacity": 2,
-  "price_per_night_cents": 12000, "currency": "MYR"
+  "room_type": "single", "capacity": 1,
+  "price_per_night_cents": 8000, "currency": "MYR"
 }]}
 ```
 
@@ -118,7 +137,7 @@ Send the customer token, request key and this JSON:
 
 ```json
 {"room_id": "R101", "check_in": "2026-11-10",
- "check_out": "2026-11-12", "guest_count": 2}
+ "check_out": "2026-11-12", "guest_count": 1, "guest_name": "Alex Tan"}
 ```
 
 **201** = new confirmed booking; **202** = pending. Both return the full Booking object:
@@ -126,7 +145,6 @@ Send the customer token, request key and this JSON:
 ```json
 {
   "booking_id": "B001",
-  "guest_name": "Alex Tan",
   "room_id": "R101",
   "check_in": "2026-11-15",
   "check_out": "2026-11-17",
@@ -138,22 +156,24 @@ Send the customer token, request key and this JSON:
 }
 ```
 
-Booking generates an unpredictable booking ID. Keys are globally unique because there are no accounts. Save the key, original normalized input and booking together in one DB transaction. Compare field values, not JSON spacing/order.
+Booking generates an unpredictable booking ID. A customer is identified by the stable customer record for their normalized phone number. Save the idempotency key and booking input with the booking. Compare field values, not JSON spacing/order.
 
 Same key + same input â†’ existing booking: 202 if pending/cancelling, 200 if confirmed/cancelled; rejected attempts repeat their saved error. Same key + changed input â†’ 409 IDEMPOTENCY_CONFLICT.
 
-### View and cancel
+### List, view and cancel
 
+- `GET /api/bookings` â†’ **200**, `{"bookings": [...]}` for the authenticated customer.
 - `GET /api/bookings/{booking_id}` â†’ **200**, full Booking object, including rejected orders.
 - `POST /api/bookings/{booking_id}/cancel` â†’ **200**, full object with status cancelled; or **202**, status cancelling while release is unresolved.
 - Unknown booking â†’ 404. Repeat cancelled cancellation â†’ 200 unchanged; repeat cancelling â†’ 202; cancel pending/rejected â†’ 409 BOOKING_STATE_CONFLICT.
-- No booking-list endpoint. Client keeps the returned ID and also lets a guest enter an ID to retrieve a booking.
+
+The booking response includes `booking_id`, `reservation_id`, `customer_id`, `room_id`, `check_in`, `check_out`, `guest_count`, `status`, price and currency fields, `notification_status`, and timestamps. `guest_name` is accepted on create and stored for the admin history and desk views; it is not included in the customer booking response.
 
 ### Client feedback
 
 | Result | Display |
 | --- | --- |
-| confirmed | Confirmation and booking ID |
+| confirmed | Confirmation and booking ID; a user notification is saved |
 | 409 ROOM_UNAVAILABLE | Room unavailable |
 | pending | Booking is being processed |
 | cancelling | Cancellation is being processed |
@@ -161,7 +181,35 @@ Same key + same input â†’ existing booking: 202 if pending/cancelling, 200 
 | rejected | Booking rejected |
 | 503 / network error | Unable to get result; preserve existing ID/request key |
 
-Poll pending/cancelling bookings with GET every 2 seconds, for up to 30 seconds. Stop when resolved; otherwise offer manual refresh. If the create response is lost, retry POST with the original key and input to retrieve the same order. Do not automatically create a new attempt.
+The website polls pending bookings and refreshes the customer's notification list. If the create response is lost, retry POST with the original key and input to retrieve the same order. Do not automatically create a new attempt.
+
+## Customer notifications
+
+`GET /api/notifications` returns this customer's notification records newest first and the unread total. Each record contains `notification_id`, `booking_id`, `message`, `created_at` (UTC timestamp), and `is_read`.
+
+```json
+{"notifications":[{"notification_id":"N123","booking_id":"B123","message":"Booking confirmed","created_at":"2026-11-20T13:00:00Z","is_read":0}],"unread_count":1}
+```
+
+`POST /api/notifications/read` marks all of the customer's notifications read and returns `{"status":"ok"}`. `POST /api/notifications/clear` deletes all of them and returns `{"status":"cleared"}`. Both require X-Customer-Token and have no request body. Booking creates messages for booking confirmation/cancellation and admin-created, admin-cancelled, check-in, check-out, and date-changed bookings. The user interface displays each message with its timestamp and shows the unread count on the bell.
+
+## Admin authentication and booking management
+
+`POST /api/admin/identify` takes `{"number":"AIRN7K29ADMIN"}` without a token. It returns `{"admin":true}` for the configured sequence or 404 otherwise. `POST /api/admin/login` takes `{"number":"...","password":"..."}` and returns `{"token":"...","expires_at":"..."}`; invalid credentials return 401. Defaults printed by `run.sh` are `AIRN7K29ADMIN` and `admin123`. Set `ADMIN_NUMBER` and `ADMIN_PASSWORD` before starting services to change them. Send the login token as X-Admin-Token to `/admin/*`. `POST /api/admin/logout` revokes that token.
+
+| Admin route | Request and result |
+| --- | --- |
+| `GET /admin/rooms?check_in=YYYY-MM-DD&check_out=YYYY-MM-DD&guest_count=1` | Available rooms for the requested stay |
+| `POST /admin/bookings` | JSON: `phone_number`, `guest_name`, `room_id`, `check_in`, `check_out`, `guest_count`; returns 201 and the booking |
+| `GET /admin/day?date=YYYY-MM-DD` | Confirmed or checked-in bookings whose stay overlaps that date, including guest name and phone |
+| `GET /admin/stats?date=YYYY-MM-DD` | Daily `arrivals`, `departures`, `in_house`, `cancelled`, and `arrival_revenue_cents` |
+| `GET /admin/bookings?from_date=YYYY-MM-DD&to_date=YYYY-MM-DD&room_id=R101` | Booking history; all filters are optional, date range overlaps stays |
+| `POST /admin/bookings/{booking_id}/cancel` | Cancels and releases the room, then notifies the guest |
+| `POST /admin/bookings/{booking_id}/checkin` | Sets status to `checked_in` and notifies the guest |
+| `POST /admin/bookings/{booking_id}/checkout` | Sets status to `checked_out` and notifies the guest |
+| `POST /admin/bookings/{booking_id}/modify` | JSON: `{"check_in":"YYYY-MM-DD","check_out":"YYYY-MM-DD"}`; changes dates if available and notifies the guest |
+
+Admin actions return the updated Booking object. A conflicting date change returns 409. The day desk includes a stay when `check_in <= date < check_out`; cancelled stays are excluded. History may include cancelled and checked-out records.
 
 ## 3. Booking â†’ Availability
 
@@ -191,6 +239,10 @@ Insert reservation and all occupied nights in one transaction, using UNIQUE(room
 
 Booking saves pending before calling reserve. Timeout means the outcome is unknown: return 202 pending. The background worker checks with the same booking ID: reserved â†’ confirm; 404 â†’ retry reserve using original input; released â†’ reject. Definite reservation rejections are saved as rejected; temporary failures remain pending.
 
+### Modify an existing reservation
+
+`POST /internal/reservations/{booking_id}/modify` requires X-Internal-Key and accepts `{"check_in":"YYYY-MM-DD","check_out":"YYYY-MM-DD"}`. It returns the updated reservation and recalculated total on 200. Unknown or inactive reservations return 404; unavailable dates return 409 ROOM_UNAVAILABLE. The change to occupied nights and reservation dates is transactional.
+
 ### Release
 
 `POST /internal/reservations/{booking_id}/release` â†’ **200**, including repeated requests:
@@ -208,7 +260,7 @@ Booking saves cancelling before release, then cancelled only after a matching re
 `POST /internal/notifications`, with X-Internal-Key:
 
 ```json
-{"event_id": "E001", "event_type": "booking.confirmed", "booking_id": "B001", "guest_name": "Alex Tan", "room_id": "R101", "check_in": "2026-11-15", "check_out": "2026-11-17"}
+{"event_id": "E001", "event_type": "booking.confirmed", "booking_id": "B001", "customer_id": "C001", "room_id": "R101", "check_in": "2026-11-15", "check_out": "2026-11-17"}
 ```
 
 Save before replying: **201** first time; **200** for an identical retry:
@@ -258,13 +310,13 @@ Phone-number login identifies a demo customer but does not verify ownership of t
 | Item | Rule |
 | --- | --- |
 | JSON | snake_case; example request fields required; reject unknown fields, nulls and malformed JSON |
-| guest_name | String, trimmed, 1â€“100 characters; allow non-ASCII names |
+| guest_name | Customer booking: trimmed, non-empty, at most 100 characters; admin booking: non-empty; allow non-ASCII names |
 | IDs | Strings, 1â€“64 letters/digits/underscores/hyphens; do not depend on example formats |
 | Dates | Real YYYY-MM-DD; check-in before check-out; at most 30 nights; past demo dates allowed |
 | Nights | Check-in included, check-out excluded: 15â€“17 November occupies nights 15 and 16 |
 | guest_count | Integer 1â€“8, not boolean/string; must fit room capacity |
 | Timestamps | Server-generated UTC ending Z |
-| Booking states | pending, confirmed, rejected, cancelling, cancelled |
+| Booking states | pending, confirmed, rejected, cancelling, cancelled, checked_in, checked_out |
 | Notification states | pending, sent; no event is sent before confirmation |
 | Recovery | Finite HTTP timeouts (e.g. 3 seconds), retry saved work (e.g. every 5 seconds) |
 | Storage | Parameterized SQL; no DB locks held during HTTP calls |
@@ -330,4 +382,4 @@ Use one Booking database transaction to mark confirmed and save a pending event 
 
 ### 6. Show the real result - M1/M5
 
-M1 refreshes pending/cancelling orders every 2 seconds for up to 30 seconds, then offers manual refresh. Same successful create replay returns 200 with its current Booking; pending stays 202; rejected repeats its saved error. M5 tests all 14 operations, phone-number session reuse, token expiry, concurrency, retries, ownership, lost replies, cancellation and notification outage/recovery. Save actual outputs. This guide is the target, not a claim that those tests passed.
+An identical successful create replay returns 200 with the current Booking; a pending attempt remains 202; a rejected attempt repeats its saved error. This guide documents the current routes and data shapes; it does not assert that a complete automated API test suite has passed.
