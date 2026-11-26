@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: airnstay
+    runtime: python
+    plan: free
+    buildCommand: "true"
+    startCommand: "bash run.sh"
+    healthCheckPath: /
+    envVars:
+      - key: INTERNAL_KEY
+        generateValue: true
+      - key: ADMIN_NUMBER
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
